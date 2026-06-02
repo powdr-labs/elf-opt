@@ -1,21 +1,14 @@
 /-
 Proofs about the extracted memcpy.
 
-We tackle two kinds of theorems:
+This file contains the concrete-input correctness sweeps: for many
+(src, dst, n, source-pattern) tuples we ask Lean to *evaluate* the
+simulator and check the output against the spec by `native_decide`.
 
-1. **Concrete correctness via the kernel.** For a handful of (src, dst, n,
-   source-pattern) tuples we ask Lean to *evaluate* the simulator and
-   check the output against the spec.  These are real kernel-level
-   proofs: `native_decide` reduces the entire interpreter chain.
-
-2. **Symbolic correctness for `n = 0`.** Stated and (partially) proven
-   by following the control flow through the routine without committing
-   to specific src/dst values. The n=0 path makes zero memory accesses
-   and runs ~12 instructions before `ret`.
-
-Item (2) is genuinely hard at scale — for arbitrary `n` it amounts to a
-loop-invariant correctness proof of a 259-instruction routine — so we
-state the general theorem but leave its proof as future work.
+Symbolic correctness for arbitrary `n` is stated below as
+`memcpy_correct_general` but its proof is future work (a 259-instr
+loop-invariant proof).  The Hoare-style block triples in
+`MemcpyProof.Hoare.*` are the foundation that proof will build on.
 -/
 
 import MemcpyProof.Harness
@@ -140,12 +133,9 @@ as machine-checked evidence for each of the alignment cases.
   * no wraparound: `dst.toNat + n.toNat < 2^32` and same for `src`,
   * disjoint regions: `dst..dst+n` and `src..src+n` do not overlap.
 
-Status: the architecture for the proof is in place
-(see `MemcpyProof.N0Proof` for the n=0 case, where we have:
-  * 4 prefix step lemmas symbolically proven,
-  * `run_4_pc_and_mem` chaining the prefix,
-  * `run_4_regs13_nonzero` showing the `bne` at PC 0x200908 is taken),
-but the full chaining across all 6 alignment paths is not yet written. -/
+Status: the Hoare-style block triples (`MemcpyProof.Hoare.*`) give the
+per-block transformations.  Composing them via the CFG plus a loop
+invariant for the 16-byte copy loop is the next step. -/
 theorem memcpy_correct_general
     (dst src n : UInt32) (mem : Mem) (fuel : Nat)
     (_fuel_big : fuel ≥ 4096 + 32 * n.toNat)

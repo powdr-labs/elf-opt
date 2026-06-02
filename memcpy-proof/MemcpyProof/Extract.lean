@@ -267,10 +267,6 @@ def words : List UInt32 := [
   0xed5ff06f
 ]
 
-/-- Instruction-fetch: maps a PC (relative to `vaddr`) to its encoded word. -/
-def fetch (offset : Nat) : UInt32 :=
-  (words[offset / 4]?).getD 0
-
 /-- Direct PC-to-word lookup, structured as a `match` on UInt32
     so the kernel can pattern-match `code <literal pc>`. -/
 def code : UInt32 → UInt32

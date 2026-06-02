@@ -3,9 +3,8 @@ Field-projection simp lemmas for `setReg`, `advance`, `storeByte`,
 `storeWord`, `loadWord`, etc.  These are the workhorses for reducing
 the post-state of a chain of `exec` applications to explicit values.
 
-`Regs` is `Vector UInt32 32`, so register lookups go via `s.regs[i]`
-where `i : Fin 32`.  `regIdx` converts a `UInt32` operand to a `Fin 32`
-index via `r.toNat % 32` (identity for valid operands `< 32`).
+`Regs` is `Vector UInt32 32`, register operands are `Reg := Fin 32`,
+register lookups go via `s.regs[r.val]`.
 -/
 
 import MemcpyProof.Sem

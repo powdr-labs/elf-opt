@@ -3,7 +3,6 @@ import MemcpyProof.RV32I
 import MemcpyProof.Sem
 import MemcpyProof.Extract
 import MemcpyProof.Harness
-import MemcpyProof.Scratch
 import MemcpyProof.Spec
 import MemcpyProof.Proof
 -- New layout-independent Hoare infrastructure:
