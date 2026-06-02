@@ -23,22 +23,19 @@ mask applied by `jalr` doesn't shift it. -/
 def retSentinel : UInt32 := 0xdead_beee
 
 /-- Empty register file (all zeroed). -/
-def zeroRegs : Regs := fun _ => 0
+def zeroRegs : Regs := Vector.replicate 32 0
 
 /-- Empty memory (all zeroed). The proof state can override this. -/
 def zeroMem : Mem := fun _ => 0
 
-/-- Initial state for invoking memcpy(dst, src, n). -/
+/-- Initial state for invoking memcpy(dst, src, n).
+    RISC-V calling convention: a0,a1,a2 in x10,x11,x12; ra is x1. -/
 def initial (dst src n : UInt32) (mem : Mem) : State :=
-  let r0 : Regs := fun _ => 0
-  -- RISC-V calling convention: a0,a1,a2 in x10,x11,x12; ra is x1.
-  let r1 : Regs := fun i =>
-    if i == 1  then retSentinel
-    else if i == 10 then dst
-    else if i == 11 then src
-    else if i == 12 then n
-    else r0 i
-  { regs := r1, mem := mem, pc := vaddr, halted := false, haltAt := retSentinel }
+  let r := zeroRegs.set 1  retSentinel (by decide)
+                  |>.set 10 dst         (by decide)
+                  |>.set 11 src         (by decide)
+                  |>.set 12 n           (by decide)
+  { regs := r, mem := mem, pc := vaddr, halted := false, haltAt := retSentinel }
 
 /-- Run up to `fuel` steps. -/
 def runMemcpy (fuel : Nat) (dst src n : UInt32) (mem : Mem) : State :=

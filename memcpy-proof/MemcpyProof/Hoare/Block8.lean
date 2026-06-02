@@ -63,17 +63,18 @@ theorem block_8byte_triple_composed :
 def R_block_8byte : State → State → Prop :=
   fun s s' =>
     s.halted = false →
-    let v0 : UInt32 := loadWord s (s.regs 14)
-    let v4 : UInt32 := loadWord s (s.regs 14 + 4)
+    let v0 : UInt32 := loadWord s (getReg s 14)
+    let v4 : UInt32 := loadWord s (getReg s 14 + 4)
     s'.pc = s.pc + 24 ∧
     s'.halted = false ∧
     s'.haltAt = s.haltAt ∧
-    s'.regs 11 = v0 ∧
-    s'.regs 15 = v4 ∧
-    s'.regs 13 = s.regs 13 + 8 ∧
-    s'.regs 14 = s.regs 14 + 8 ∧
-    (∀ r, r ≠ 11 → r ≠ 13 → r ≠ 14 → r ≠ 15 → s'.regs r = s.regs r) ∧
-    s'.mem = (storeWord (storeWord s (s.regs 13) v0) (s.regs 13 + 4) v4).mem
+    getReg s' 11 = v0 ∧
+    getReg s' 15 = v4 ∧
+    getReg s' 13 = getReg s 13 + 8 ∧
+    getReg s' 14 = getReg s 14 + 8 ∧
+    (∀ r : Fin 32, r.val ≠ 11 → r.val ≠ 13 → r.val ≠ 14 → r.val ≠ 15 →
+       s'.regs[r.val] = s.regs[r.val]) ∧
+    s'.mem = (storeWord (storeWord s (getReg s 13) v0) (getReg s 13 + 4) v4).mem
 
 theorem block_8byte_triple : Triple block_8byte R_block_8byte := by
   refine Triple.weaken block_8byte_triple_composed ?_
@@ -84,17 +85,18 @@ theorem block_8byte_triple : Triple block_8byte R_block_8byte := by
   have e4 := h_s4 (by simp [h_halted]); subst e4
   have e5 := h_s5 (by simp [h_halted]); subst e5
   have e' := h_s' (by simp [h_halted]); subst e'
-  have h14 : getReg s 14 = s.regs 14 := getReg_nonzero s 14 (by decide)
-  have h13 : getReg s 13 = s.regs 13 := getReg_nonzero s 13 (by decide)
   refine ⟨?_, ?_, rfl, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · show s.pc + 4 + 4 + 4 + 4 + 4 + 4 = s.pc + 24; bv_decide
   · simp [h_halted]
-  · simp [h14]
-  · simp [h14]
-  · simp [h13]
-  · simp [h14]
-  · intro r hr11 hr13 hr14 hr15; simp [hr11, hr13, hr14, hr15]
-  · simp [h14, h13]
+  · simp (config := { decide := true })
+  · simp (config := { decide := true })
+  · simp (config := { decide := true })
+  · simp (config := { decide := true })
+  · intro r hr11 hr13 hr14 hr15
+    simp (config := { decide := true })
+      [setReg, Vector.getElem_set_ne,
+       Ne.symm hr11, Ne.symm hr13, Ne.symm hr14, Ne.symm hr15]
+  · simp (config := { decide := true })
     unfold storeWord
     simp [storeByte]
 

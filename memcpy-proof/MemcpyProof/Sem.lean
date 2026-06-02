@@ -18,10 +18,11 @@ always succeed; the proofs make no assumption about bytes outside the
 region they actually touch. -/
 abbrev Mem := UInt32 → UInt8
 
-/-- Register file. Reads from x0 must return 0; we enforce that in
-`getReg` rather than in the underlying function so update logic stays
-uniform. -/
-abbrev Regs := UInt32 → UInt32
+/-- Register file: exactly 32 GP registers (RISC-V).  Stored as a
+`Vector` so updates are flat, not nested-`if` lambdas. -/
+abbrev Regs := Vector UInt32 32
+
+export MemcpyProof.RV32I (Reg)
 
 structure State where
   regs   : Regs
@@ -33,12 +34,12 @@ structure State where
   /-- The return address we entered with; once `pc = haltAt`, we stop. -/
   haltAt : UInt32
 
-@[inline] def getReg (s : State) (r : UInt32) : UInt32 :=
-  if r == 0 then 0 else s.regs r
+@[inline] def getReg (s : State) (r : Reg) : UInt32 :=
+  if r = 0 then 0 else s.regs[r]
 
-@[inline] def setReg (s : State) (r : UInt32) (v : UInt32) : State :=
-  if r == 0 then s
-  else { s with regs := fun i => if i == r then v else s.regs i }
+@[inline] def setReg (s : State) (r : Reg) (v : UInt32) : State :=
+  if r = 0 then s
+  else { s with regs := s.regs.set r.val v r.isLt }
 
 @[inline] def loadByte (s : State) (addr : UInt32) : UInt8 := s.mem addr
 

@@ -12,6 +12,10 @@ and because we want a tight kernel-reducible interpreter for proofs.
 
 namespace MemcpyProof.RV32I
 
+/-- A RISC-V register index — 0..31.  Defined here so that `Instr`'s
+register-operand fields are bounded by construction. -/
+abbrev Reg := Fin 32
+
 /-! ## Bit-extraction helpers (all over `UInt32`). -/
 
 @[reducible] def bits (w : UInt32) (lo hi : Nat) : UInt32 :=
@@ -22,10 +26,13 @@ namespace MemcpyProof.RV32I
   (x ^^^ m) - m
 
 @[reducible] def opcode (w : UInt32) : UInt32 := bits w 0 6
-@[reducible] def rd    (w : UInt32) : UInt32 := bits w 7 11
+@[reducible] def rd    (w : UInt32) : Reg :=
+  ⟨(bits w 7 11).toNat % 32, Nat.mod_lt _ (by decide)⟩
 @[reducible] def funct3 (w : UInt32) : UInt32 := bits w 12 14
-@[reducible] def rs1   (w : UInt32) : UInt32 := bits w 15 19
-@[reducible] def rs2   (w : UInt32) : UInt32 := bits w 20 24
+@[reducible] def rs1   (w : UInt32) : Reg :=
+  ⟨(bits w 15 19).toNat % 32, Nat.mod_lt _ (by decide)⟩
+@[reducible] def rs2   (w : UInt32) : Reg :=
+  ⟨(bits w 20 24).toNat % 32, Nat.mod_lt _ (by decide)⟩
 @[reducible] def funct7 (w : UInt32) : UInt32 := bits w 25 31
 
 @[reducible] def immI (w : UInt32) : UInt32 := signExt (bits w 20 31) 11
@@ -49,50 +56,50 @@ namespace MemcpyProof.RV32I
 
 inductive Instr where
   -- I-type ALU (op-imm)
-  | addi  (rd rs1 : UInt32) (imm : UInt32)
-  | slti  (rd rs1 : UInt32) (imm : UInt32)
-  | sltiu (rd rs1 : UInt32) (imm : UInt32)
-  | xori  (rd rs1 : UInt32) (imm : UInt32)
-  | ori   (rd rs1 : UInt32) (imm : UInt32)
-  | andi  (rd rs1 : UInt32) (imm : UInt32)
-  | slli  (rd rs1 : UInt32) (shamt : UInt32)
-  | srli  (rd rs1 : UInt32) (shamt : UInt32)
-  | srai  (rd rs1 : UInt32) (shamt : UInt32)
+  | addi  (rd rs1 : Reg) (imm : UInt32)
+  | slti  (rd rs1 : Reg) (imm : UInt32)
+  | sltiu (rd rs1 : Reg) (imm : UInt32)
+  | xori  (rd rs1 : Reg) (imm : UInt32)
+  | ori   (rd rs1 : Reg) (imm : UInt32)
+  | andi  (rd rs1 : Reg) (imm : UInt32)
+  | slli  (rd rs1 : Reg) (shamt : UInt32)
+  | srli  (rd rs1 : Reg) (shamt : UInt32)
+  | srai  (rd rs1 : Reg) (shamt : UInt32)
   -- R-type ALU (op)
-  | add   (rd rs1 rs2 : UInt32)
-  | sub   (rd rs1 rs2 : UInt32)
-  | sll   (rd rs1 rs2 : UInt32)
-  | slt   (rd rs1 rs2 : UInt32)
-  | sltu  (rd rs1 rs2 : UInt32)
-  | xor   (rd rs1 rs2 : UInt32)
-  | srl   (rd rs1 rs2 : UInt32)
-  | sra   (rd rs1 rs2 : UInt32)
-  | or_   (rd rs1 rs2 : UInt32)
-  | and_  (rd rs1 rs2 : UInt32)
+  | add   (rd rs1 rs2 : Reg)
+  | sub   (rd rs1 rs2 : Reg)
+  | sll   (rd rs1 rs2 : Reg)
+  | slt   (rd rs1 rs2 : Reg)
+  | sltu  (rd rs1 rs2 : Reg)
+  | xor   (rd rs1 rs2 : Reg)
+  | srl   (rd rs1 rs2 : Reg)
+  | sra   (rd rs1 rs2 : Reg)
+  | or_   (rd rs1 rs2 : Reg)
+  | and_  (rd rs1 rs2 : Reg)
   -- M-ext (only what memcpy might touch)
-  | mul   (rd rs1 rs2 : UInt32)
+  | mul   (rd rs1 rs2 : Reg)
   -- loads
-  | lb    (rd rs1 : UInt32) (imm : UInt32)
-  | lh    (rd rs1 : UInt32) (imm : UInt32)
-  | lw    (rd rs1 : UInt32) (imm : UInt32)
-  | lbu   (rd rs1 : UInt32) (imm : UInt32)
-  | lhu   (rd rs1 : UInt32) (imm : UInt32)
+  | lb    (rd rs1 : Reg) (imm : UInt32)
+  | lh    (rd rs1 : Reg) (imm : UInt32)
+  | lw    (rd rs1 : Reg) (imm : UInt32)
+  | lbu   (rd rs1 : Reg) (imm : UInt32)
+  | lhu   (rd rs1 : Reg) (imm : UInt32)
   -- stores
-  | sb    (rs1 rs2 : UInt32) (imm : UInt32)
-  | sh    (rs1 rs2 : UInt32) (imm : UInt32)
-  | sw    (rs1 rs2 : UInt32) (imm : UInt32)
+  | sb    (rs1 rs2 : Reg) (imm : UInt32)
+  | sh    (rs1 rs2 : Reg) (imm : UInt32)
+  | sw    (rs1 rs2 : Reg) (imm : UInt32)
   -- branches
-  | beq   (rs1 rs2 : UInt32) (imm : UInt32)
-  | bne   (rs1 rs2 : UInt32) (imm : UInt32)
-  | blt   (rs1 rs2 : UInt32) (imm : UInt32)
-  | bge   (rs1 rs2 : UInt32) (imm : UInt32)
-  | bltu  (rs1 rs2 : UInt32) (imm : UInt32)
-  | bgeu  (rs1 rs2 : UInt32) (imm : UInt32)
+  | beq   (rs1 rs2 : Reg) (imm : UInt32)
+  | bne   (rs1 rs2 : Reg) (imm : UInt32)
+  | blt   (rs1 rs2 : Reg) (imm : UInt32)
+  | bge   (rs1 rs2 : Reg) (imm : UInt32)
+  | bltu  (rs1 rs2 : Reg) (imm : UInt32)
+  | bgeu  (rs1 rs2 : Reg) (imm : UInt32)
   -- jumps + upper-imm
-  | jal   (rd : UInt32) (imm : UInt32)
-  | jalr  (rd rs1 : UInt32) (imm : UInt32)
-  | lui   (rd : UInt32) (imm : UInt32)
-  | auipc (rd : UInt32) (imm : UInt32)
+  | jal   (rd : Reg) (imm : UInt32)
+  | jalr  (rd rs1 : Reg) (imm : UInt32)
+  | lui   (rd : Reg) (imm : UInt32)
+  | auipc (rd : Reg) (imm : UInt32)
   -- fence / system / etc. we don't need; encode generically
   | other (raw : UInt32)
   deriving Repr, Inhabited
@@ -169,12 +176,12 @@ inductive Instr where
 
 /-! ## Pretty-printing for sanity-checks. -/
 
-def regName (i : UInt32) : String :=
+def regName (r : Reg) : String :=
   let names := #["zero","ra","sp","gp","tp","t0","t1","t2",
                  "s0","s1","a0","a1","a2","a3","a4","a5",
                  "a6","a7","s2","s3","s4","s5","s6","s7",
                  "s8","s9","s10","s11","t3","t4","t5","t6"]
-  if i.toNat < 32 then names[i.toNat]! else s!"x{i}"
+  names[r.val]!
 
 def signedDec (x : UInt32) : String :=
   if x &&& 0x80000000 != 0 then

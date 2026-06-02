@@ -27,7 +27,7 @@ theorem Triple_instr (i : Instr) :
 
 /-! ## Instruction-class triples, with the post-state spelled out. -/
 
-theorem Triple_addi (rd rs1 imm : UInt32) :
+theorem Triple_addi (rd rs1 : Reg) (imm : UInt32) :
     Triple [Instr.addi rd rs1 imm]
       (fun s s' => s.halted = false →
         s' = advance (setReg s rd (getReg s rs1 + imm))) := by
@@ -36,7 +36,7 @@ theorem Triple_addi (rd rs1 imm : UInt32) :
         (exec_addi s rd rs1 imm).symm]
   exact Triple_instr _ s h
 
-theorem Triple_andi (rd rs1 imm : UInt32) :
+theorem Triple_andi (rd rs1 : Reg) (imm : UInt32) :
     Triple [Instr.andi rd rs1 imm]
       (fun s s' => s.halted = false →
         s' = advance (setReg s rd (getReg s rs1 &&& imm))) := by
@@ -45,7 +45,7 @@ theorem Triple_andi (rd rs1 imm : UInt32) :
         (exec_andi s rd rs1 imm).symm]
   exact Triple_instr _ s h
 
-theorem Triple_ori (rd rs1 imm : UInt32) :
+theorem Triple_ori (rd rs1 : Reg) (imm : UInt32) :
     Triple [Instr.ori rd rs1 imm]
       (fun s s' => s.halted = false →
         s' = advance (setReg s rd (getReg s rs1 ||| imm))) := by
@@ -54,7 +54,7 @@ theorem Triple_ori (rd rs1 imm : UInt32) :
         (exec_ori s rd rs1 imm).symm]
   exact Triple_instr _ s h
 
-theorem Triple_slli (rd rs1 sh : UInt32) :
+theorem Triple_slli (rd rs1 : Reg) (sh : UInt32) :
     Triple [Instr.slli rd rs1 sh]
       (fun s s' => s.halted = false →
         s' = advance (setReg s rd (getReg s rs1 <<< sh))) := by
@@ -63,7 +63,7 @@ theorem Triple_slli (rd rs1 sh : UInt32) :
         (exec_slli s rd rs1 sh).symm]
   exact Triple_instr _ s h
 
-theorem Triple_srli (rd rs1 sh : UInt32) :
+theorem Triple_srli (rd rs1 : Reg) (sh : UInt32) :
     Triple [Instr.srli rd rs1 sh]
       (fun s s' => s.halted = false →
         s' = advance (setReg s rd (getReg s rs1 >>> sh))) := by
@@ -72,7 +72,7 @@ theorem Triple_srli (rd rs1 sh : UInt32) :
         (exec_srli s rd rs1 sh).symm]
   exact Triple_instr _ s h
 
-theorem Triple_lw (rd rs1 imm : UInt32) :
+theorem Triple_lw (rd rs1 : Reg) (imm : UInt32) :
     Triple [Instr.lw rd rs1 imm]
       (fun s s' => s.halted = false →
         s' = advance (setReg s rd (loadWord s (getReg s rs1 + imm)))) := by
@@ -82,7 +82,7 @@ theorem Triple_lw (rd rs1 imm : UInt32) :
         (exec_lw s rd rs1 imm).symm]
   exact Triple_instr _ s h
 
-theorem Triple_sw (rs1 rs2 imm : UInt32) :
+theorem Triple_sw (rs1 rs2 : Reg) (imm : UInt32) :
     Triple [Instr.sw rs1 rs2 imm]
       (fun s s' => s.halted = false →
         s' = advance (storeWord s (getReg s rs1 + imm) (getReg s rs2))) := by
@@ -92,7 +92,7 @@ theorem Triple_sw (rs1 rs2 imm : UInt32) :
         (exec_sw s rs1 rs2 imm).symm]
   exact Triple_instr _ s h
 
-theorem Triple_sb (rs1 rs2 imm : UInt32) :
+theorem Triple_sb (rs1 rs2 : Reg) (imm : UInt32) :
     Triple [Instr.sb rs1 rs2 imm]
       (fun s s' => s.halted = false →
         s' = advance (storeByte s (getReg s rs1 + imm) (getReg s rs2).toUInt8)) := by

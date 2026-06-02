@@ -2,6 +2,10 @@
 Field-projection simp lemmas for `setReg`, `advance`, `storeByte`,
 `storeWord`, `loadWord`, etc.  These are the workhorses for reducing
 the post-state of a chain of `exec` applications to explicit values.
+
+`Regs` is `Vector UInt32 32`, so register lookups go via `s.regs[i]`
+where `i : Fin 32`.  `regIdx` converts a `UInt32` operand to a `Fin 32`
+index via `r.toNat % 32` (identity for valid operands `< 32`).
 -/
 
 import MemcpyProof.Sem
@@ -9,6 +13,47 @@ import MemcpyProof.Sem
 namespace MemcpyProof.Hoare
 
 open MemcpyProof.Sem
+
+/-! ## Coercion `(n : Reg) → Nat` evaluates for literals.
+
+Each of the 32 register indices has its own `@[simp]` lemma saying
+`((n : Reg) : Nat) = n`.  This lets simp peel `Vector.set/getElem`
+side conditions like `(↑(11 : Reg) : Nat) ≠ r.val` down to
+`(11 : Nat) ≠ r.val`, which matches `Fin 32`-quantified frame
+hypotheses directly. -/
+
+@[simp] theorem Reg.val_0 : ((0 : Reg) : Nat) = 0 := rfl
+@[simp] theorem Reg.val_1 : ((1 : Reg) : Nat) = 1 := rfl
+@[simp] theorem Reg.val_2 : ((2 : Reg) : Nat) = 2 := rfl
+@[simp] theorem Reg.val_3 : ((3 : Reg) : Nat) = 3 := rfl
+@[simp] theorem Reg.val_4 : ((4 : Reg) : Nat) = 4 := rfl
+@[simp] theorem Reg.val_5 : ((5 : Reg) : Nat) = 5 := rfl
+@[simp] theorem Reg.val_6 : ((6 : Reg) : Nat) = 6 := rfl
+@[simp] theorem Reg.val_7 : ((7 : Reg) : Nat) = 7 := rfl
+@[simp] theorem Reg.val_8 : ((8 : Reg) : Nat) = 8 := rfl
+@[simp] theorem Reg.val_9 : ((9 : Reg) : Nat) = 9 := rfl
+@[simp] theorem Reg.val_10 : ((10 : Reg) : Nat) = 10 := rfl
+@[simp] theorem Reg.val_11 : ((11 : Reg) : Nat) = 11 := rfl
+@[simp] theorem Reg.val_12 : ((12 : Reg) : Nat) = 12 := rfl
+@[simp] theorem Reg.val_13 : ((13 : Reg) : Nat) = 13 := rfl
+@[simp] theorem Reg.val_14 : ((14 : Reg) : Nat) = 14 := rfl
+@[simp] theorem Reg.val_15 : ((15 : Reg) : Nat) = 15 := rfl
+@[simp] theorem Reg.val_16 : ((16 : Reg) : Nat) = 16 := rfl
+@[simp] theorem Reg.val_17 : ((17 : Reg) : Nat) = 17 := rfl
+@[simp] theorem Reg.val_18 : ((18 : Reg) : Nat) = 18 := rfl
+@[simp] theorem Reg.val_19 : ((19 : Reg) : Nat) = 19 := rfl
+@[simp] theorem Reg.val_20 : ((20 : Reg) : Nat) = 20 := rfl
+@[simp] theorem Reg.val_21 : ((21 : Reg) : Nat) = 21 := rfl
+@[simp] theorem Reg.val_22 : ((22 : Reg) : Nat) = 22 := rfl
+@[simp] theorem Reg.val_23 : ((23 : Reg) : Nat) = 23 := rfl
+@[simp] theorem Reg.val_24 : ((24 : Reg) : Nat) = 24 := rfl
+@[simp] theorem Reg.val_25 : ((25 : Reg) : Nat) = 25 := rfl
+@[simp] theorem Reg.val_26 : ((26 : Reg) : Nat) = 26 := rfl
+@[simp] theorem Reg.val_27 : ((27 : Reg) : Nat) = 27 := rfl
+@[simp] theorem Reg.val_28 : ((28 : Reg) : Nat) = 28 := rfl
+@[simp] theorem Reg.val_29 : ((29 : Reg) : Nat) = 29 := rfl
+@[simp] theorem Reg.val_30 : ((30 : Reg) : Nat) = 30 := rfl
+@[simp] theorem Reg.val_31 : ((31 : Reg) : Nat) = 31 := rfl
 
 /-! ## `advance` — preserves all fields except `pc`. -/
 
@@ -20,88 +65,71 @@ open MemcpyProof.Sem
 
 /-! ## `setReg` — preserves all fields except `regs`. -/
 
-@[simp] theorem setReg_pc (s : State) (r v : UInt32) : (setReg s r v).pc = s.pc := by
+@[simp] theorem setReg_pc (s : State) (r : Reg) (v : UInt32) : (setReg s r v).pc = s.pc := by
   unfold setReg; split <;> rfl
-@[simp] theorem setReg_mem (s : State) (r v : UInt32) : (setReg s r v).mem = s.mem := by
+@[simp] theorem setReg_mem (s : State) (r : Reg) (v : UInt32) : (setReg s r v).mem = s.mem := by
   unfold setReg; split <;> rfl
-@[simp] theorem setReg_halted (s : State) (r v : UInt32) : (setReg s r v).halted = s.halted := by
-  unfold setReg; split <;> rfl
-@[simp] theorem setReg_haltAt (s : State) (r v : UInt32) : (setReg s r v).haltAt = s.haltAt := by
-  unfold setReg; split <;> rfl
-
-/-- Reading the just-written register (for r ≠ 0).  Marked `@[simp]` so
-    simp auto-discharges the `r ≠ 0` side condition by `decide` when r
-    is a concrete numeric literal. -/
-@[simp] theorem setReg_regs_same (s : State) (r v : UInt32) (h : r ≠ 0) :
-    (setReg s r v).regs r = v := by
-  unfold setReg
-  rw [if_neg]
-  · show (fun i => if i == r then v else s.regs i) r = v
-    simp
-  · intro contra; exact h (by simpa using contra)
-
-/-- Reading a different register (frame).  Marked `@[simp]` so simp
-    auto-discharges the `r' ≠ r` side condition by `decide` for literal
-    register numbers, or via the user-provided hypothesis. -/
-@[simp] theorem setReg_regs_other (s : State) (r r' v : UInt32) (h : r' ≠ r) :
-    (setReg s r v).regs r' = s.regs r' := by
-  unfold setReg
-  split
-  · rfl
-  · show (if r' == r then v else s.regs r') = s.regs r'
-    rw [if_neg]
-    intro contra; exact h (by simpa using contra)
+@[simp] theorem setReg_halted (s : State) (r : Reg) (v : UInt32) :
+    (setReg s r v).halted = s.halted := by unfold setReg; split <;> rfl
+@[simp] theorem setReg_haltAt (s : State) (r : Reg) (v : UInt32) :
+    (setReg s r v).haltAt = s.haltAt := by unfold setReg; split <;> rfl
 
 /-- `setReg` to register 0 is a no-op (x0 is hardwired to 0). -/
 @[simp] theorem setReg_zero (s : State) (v : UInt32) : setReg s 0 v = s := by
   unfold setReg; simp
 
-/-! ## `getReg` reduces predictably. -/
+/-! ## `getReg` / `setReg` interaction.  Side conditions are on the
+`Fin 32` register indices; for concrete literal registers `decide`
+discharges them automatically. -/
 
-theorem getReg_zero (s : State) : getReg s 0 = 0 := by unfold getReg; rfl
+@[simp] theorem getReg_zero (s : State) : getReg s 0 = 0 := by unfold getReg; rfl
 
-theorem getReg_nonzero (s : State) (r : UInt32) (h : r ≠ 0) :
-    getReg s r = s.regs r := by
-  unfold getReg
-  rw [if_neg]
-  intro contra; exact h (by simpa using contra)
+/-- Reading the just-written register (for r ≠ 0). -/
+@[simp] theorem getReg_setReg_same (s : State) (r : Reg) (v : UInt32) (h : r ≠ 0) :
+    getReg (setReg s r v) r = v := by
+  unfold getReg setReg
+  rw [if_neg h, if_neg h]
+  show (s.regs.set r.val v r.isLt)[r.val] = v
+  exact Vector.getElem_set_self _
 
-/-! ## `loadWord`/`loadByte` only depend on `.mem`, which `advance`/`setReg`
+/-- Reading a different register (frame). -/
+@[simp] theorem getReg_setReg_other (s : State) (r r' : Reg) (v : UInt32)
+    (h_ne : r ≠ r') (h0 : r' ≠ 0) :
+    getReg (setReg s r v) r' = getReg s r' := by
+  unfold getReg setReg
+  rw [if_neg h0]
+  split
+  · rfl
+  · show (s.regs.set r.val v r.isLt)[r'.val] = s.regs[r'.val]
+    apply Vector.getElem_set_ne
+    intro contra; exact h_ne (Fin.ext contra)
+
+/-! ## Memory accessors only depend on `.mem`, which `advance`/`setReg`
 preserve. -/
 
 @[simp] theorem loadByte_advance (s : State) (a : UInt32) :
     loadByte (advance s) a = loadByte s a := rfl
 
-@[simp] theorem loadByte_setReg (s : State) (r v a : UInt32) :
+@[simp] theorem loadByte_setReg (s : State) (r : Reg) (v a : UInt32) :
     loadByte (setReg s r v) a = loadByte s a := by unfold loadByte setReg; split <;> rfl
 
 @[simp] theorem loadWord_advance (s : State) (a : UInt32) :
     loadWord (advance s) a = loadWord s a := by unfold loadWord; simp
 
-@[simp] theorem loadWord_setReg (s : State) (r v a : UInt32) :
+@[simp] theorem loadWord_setReg (s : State) (r : Reg) (v a : UInt32) :
     loadWord (setReg s r v) a = loadWord s a := by unfold loadWord; simp
 
-/-! ## `getReg` propagates through state updates. -/
+/-! ## `getReg` propagates through state updates that don't change regs. -/
 
-@[simp] theorem getReg_advance (s : State) (r : UInt32) :
+@[simp] theorem getReg_advance (s : State) (r : Reg) :
     getReg (advance s) r = getReg s r := by unfold getReg; rfl
 
-@[simp] theorem getReg_storeByte (s : State) (a : UInt32) (b : UInt8) (r : UInt32) :
+@[simp] theorem getReg_storeByte (s : State) (a : UInt32) (b : UInt8) (r : Reg) :
     getReg (storeByte s a b) r = getReg s r := by unfold getReg; rfl
 
-@[simp] theorem getReg_storeWord (s : State) (a v r : UInt32) :
+@[simp] theorem getReg_storeWord (s : State) (a v : UInt32) (r : Reg) :
     getReg (storeWord s a v) r = getReg s r := by
   unfold storeWord; simp
-
-@[simp] theorem getReg_setReg_same (s : State) (r v : UInt32) (h : r ≠ 0) :
-    getReg (setReg s r v) r = v := by
-  rw [getReg_nonzero _ _ h]
-  exact setReg_regs_same s r v h
-
-@[simp] theorem getReg_setReg_other (s : State) (r r' v : UInt32) (h : r' ≠ r) (h0 : r' ≠ 0) :
-    getReg (setReg s r v) r' = getReg s r' := by
-  rw [getReg_nonzero _ _ h0, getReg_nonzero _ _ h0]
-  exact setReg_regs_other s r r' v h
 
 /-! ## `storeByte` — preserves all fields except `mem`. -/
 
@@ -130,79 +158,79 @@ classes — `simp` lemmas that let `runInstrs_cons_not_halted` chain
 through a basic block. -/
 
 open MemcpyProof.RV32I in
-@[simp] theorem exec_addi_halted (s : State) (rd rs1 imm : UInt32) :
+@[simp] theorem exec_addi_halted (s : State) (rd rs1 : Reg) (imm : UInt32) :
     (exec s (Instr.addi rd rs1 imm)).halted = s.halted := by
   show (advance (setReg s rd (getReg s rs1 + imm))).halted = s.halted
   simp
 
 open MemcpyProof.RV32I in
-@[simp] theorem exec_andi_halted (s : State) (rd rs1 imm : UInt32) :
+@[simp] theorem exec_andi_halted (s : State) (rd rs1 : Reg) (imm : UInt32) :
     (exec s (Instr.andi rd rs1 imm)).halted = s.halted := by
   show (advance (setReg s rd (getReg s rs1 &&& imm))).halted = s.halted
   simp
 
 open MemcpyProof.RV32I in
-@[simp] theorem exec_ori_halted (s : State) (rd rs1 imm : UInt32) :
+@[simp] theorem exec_ori_halted (s : State) (rd rs1 : Reg) (imm : UInt32) :
     (exec s (Instr.ori rd rs1 imm)).halted = s.halted := by
   show (advance (setReg s rd (getReg s rs1 ||| imm))).halted = s.halted
   simp
 
 open MemcpyProof.RV32I in
-@[simp] theorem exec_slli_halted (s : State) (rd rs1 sh : UInt32) :
+@[simp] theorem exec_slli_halted (s : State) (rd rs1 : Reg) (sh : UInt32) :
     (exec s (Instr.slli rd rs1 sh)).halted = s.halted := by
   show (advance (setReg s rd (getReg s rs1 <<< sh))).halted = s.halted
   simp
 
 open MemcpyProof.RV32I in
-@[simp] theorem exec_srli_halted (s : State) (rd rs1 sh : UInt32) :
+@[simp] theorem exec_srli_halted (s : State) (rd rs1 : Reg) (sh : UInt32) :
     (exec s (Instr.srli rd rs1 sh)).halted = s.halted := by
   show (advance (setReg s rd (getReg s rs1 >>> sh))).halted = s.halted
   simp
 
 open MemcpyProof.RV32I in
-@[simp] theorem exec_sltiu_halted (s : State) (rd rs1 imm : UInt32) :
+@[simp] theorem exec_sltiu_halted (s : State) (rd rs1 : Reg) (imm : UInt32) :
     (exec s (Instr.sltiu rd rs1 imm)).halted = s.halted := by
   show (advance (setReg s rd _)).halted = s.halted
   simp
 
 open MemcpyProof.RV32I in
-@[simp] theorem exec_and_halted (s : State) (rd rs1 rs2 : UInt32) :
+@[simp] theorem exec_and_halted (s : State) (rd rs1 rs2 : Reg) :
     (exec s (Instr.and_ rd rs1 rs2)).halted = s.halted := by
   show (advance (setReg s rd (getReg s rs1 &&& getReg s rs2))).halted = s.halted
   simp
 
 open MemcpyProof.RV32I in
-@[simp] theorem exec_or_halted (s : State) (rd rs1 rs2 : UInt32) :
+@[simp] theorem exec_or_halted (s : State) (rd rs1 rs2 : Reg) :
     (exec s (Instr.or_ rd rs1 rs2)).halted = s.halted := by
   show (advance (setReg s rd (getReg s rs1 ||| getReg s rs2))).halted = s.halted
   simp
 
 open MemcpyProof.RV32I in
-@[simp] theorem exec_sltu_halted (s : State) (rd rs1 rs2 : UInt32) :
+@[simp] theorem exec_sltu_halted (s : State) (rd rs1 rs2 : Reg) :
     (exec s (Instr.sltu rd rs1 rs2)).halted = s.halted := by
   show (advance (setReg s rd _)).halted = s.halted
   simp
 
 open MemcpyProof.RV32I in
-@[simp] theorem exec_lb_halted (s : State) (rd rs1 imm : UInt32) :
+@[simp] theorem exec_lb_halted (s : State) (rd rs1 : Reg) (imm : UInt32) :
     (exec s (Instr.lb rd rs1 imm)).halted = s.halted := by
   show (advance (setReg s rd _)).halted = s.halted
   simp
 
 open MemcpyProof.RV32I in
-@[simp] theorem exec_lw_halted (s : State) (rd rs1 imm : UInt32) :
+@[simp] theorem exec_lw_halted (s : State) (rd rs1 : Reg) (imm : UInt32) :
     (exec s (Instr.lw rd rs1 imm)).halted = s.halted := by
   show (advance (setReg s rd (loadWord s (getReg s rs1 + imm)))).halted = s.halted
   simp
 
 open MemcpyProof.RV32I in
-@[simp] theorem exec_sw_halted (s : State) (rs1 rs2 imm : UInt32) :
+@[simp] theorem exec_sw_halted (s : State) (rs1 rs2 : Reg) (imm : UInt32) :
     (exec s (Instr.sw rs1 rs2 imm)).halted = s.halted := by
   show (advance (storeWord s _ _)).halted = s.halted
   simp
 
 open MemcpyProof.RV32I in
-@[simp] theorem exec_sb_halted (s : State) (rs1 rs2 imm : UInt32) :
+@[simp] theorem exec_sb_halted (s : State) (rs1 rs2 : Reg) (imm : UInt32) :
     (exec s (Instr.sb rs1 rs2 imm)).halted = s.halted := by
   show (advance (storeByte s _ _)).halted = s.halted
   simp
