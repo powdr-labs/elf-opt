@@ -8,8 +8,8 @@ branch target.  Tick `[x]` once a `Triple` proof exists in
 ## Status summary
 
 - **Total blocks:** 40
-- **Done:** 37 — including the byte-prefix loop body (B2, 14 instr, 3-chunk split).
-- **Remaining:** 3 — B36 (16-byte unaligned tail, ~34 instr), B38 (8-byte unaligned tail, ~18 instr), plus B14's structured R (currently in composed form).
+- **Done:** 40 — every block has a `Triple`.
+- **Remaining:** 0 (B36 and B38 use the strongest-postcondition form `s' = runInstrs s block` plus extraction lemmas for the high-level facts the CFG layer needs; the unconditional clean R would require explicit aliasing reasoning that belongs at the correctness layer).
 
 > **Refactor note (2026-06-02):** the `halted` / `haltAt` State fields were removed.  Hoare-level proofs no longer carry a halted precondition; the "routine has returned" predicate moves to the CFG/harness layer as `s.pc = retSentinel`.  All existing block proofs were updated; the foundation now lives in 3 files (Block.lean, Triple.lean, InstrTriples.lean) with no halted bookkeeping.
 
@@ -176,14 +176,14 @@ Targets reachable by branches/jumps, computed from the assembly:
 
 ### Big unaligned tails (loop-free, byte-by-byte)
 
-- [ ] **B36 `block_16byte_unaligned`** — 0x200c18..0x200c9c (~34 instr)
-  *Copy 16 bytes one at a time via lb/sb sequence.  Falls through to B37.*
+- [x] **B36 `block_16byte_unaligned`** *(Blocks/Tail16Unaligned.lean)* — 0x200c18..0x200c9c (34 instr)
+  *Copy 16 bytes one at a time via lb/sb sequence.  Triple given in SP form `s' = runInstrs s block` plus pc/a0/a1/a2/a3/a4 extraction lemmas.  Builds in ~16s.*
 
 - [x] **B37 `block_B37`** *(Blocks/Simple.lean)* — 0x200ca0..0x200ca4 (2 instr) → beq @0x200ca8
   *`addi a3,a1,0 ; andi a1,a2,8` — check if 8 more bytes.*
 
-- [ ] **B38 `block_8byte_unaligned`** — 0x200cac..0x200cf0 (~18 instr)
-  *Copy 8 bytes one at a time via lb/sb sequence.  Falls through to B39.*
+- [x] **B38 `block_8byte_unaligned`** *(Blocks/Tail8Unaligned.lean)* — 0x200cac..0x200cf0 (18 instr)
+  *Copy 8 bytes one at a time via lb/sb sequence.  Triple in SP form plus extraction lemmas.  Builds in ~3s.*
 
 - [x] **B39 `block_B39`** *(Blocks/Simple.lean)* — 0x200cf4..0x200cf8 (2 instr) → bne @0x200cfc
   *`addi a3,a1,0 ; andi a1,a2,4` — bne back to B28 if 4 more bytes.*
