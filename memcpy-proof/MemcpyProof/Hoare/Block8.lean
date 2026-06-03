@@ -56,20 +56,12 @@ def R_block_8byte : State → State → Prop :=
 
 theorem block_8byte_triple : Triple block_8byte R_block_8byte := by
   refine Triple.weaken block_8byte_triple_composed ?_
-  rintro s s' ⟨s1, h_s1, s2, h_s2, s3, h_s3, s4, h_s4, s5, h_s5, h_s'⟩
-  subst h_s1; subst h_s2; subst h_s3; subst h_s4; subst h_s5; subst h_s'
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · show s.pc + 4 + 4 + 4 + 4 + 4 + 4 = s.pc + 24; bv_decide
-  · simp (config := { decide := true })
-  · simp (config := { decide := true })
-  · simp (config := { decide := true })
-  · simp (config := { decide := true })
+  rintro s s' ⟨_, rfl, _, rfl, _, rfl, _, rfl, _, rfl, rfl⟩
+  have h_pc : s.pc + 4 + 4 + 4 + 4 + 4 + 4 = s.pc + 24 := by bv_decide
+  simp [R_block_8byte, h_pc]
+  refine ⟨?_, ?_⟩
   · intro r hr11 hr13 hr14 hr15
-    simp (config := { decide := true })
-      [setReg, Vector.getElem_set_ne,
-       Ne.symm hr11, Ne.symm hr13, Ne.symm hr14, Ne.symm hr15]
-  · simp (config := { decide := true })
-    unfold storeWord
-    simp [storeByte]
+    simp [setReg, Ne.symm hr11, Ne.symm hr13, Ne.symm hr14, Ne.symm hr15]
+  · unfold storeWord; simp [storeByte]
 
 end MemcpyProof.Hoare

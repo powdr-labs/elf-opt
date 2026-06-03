@@ -20,3 +20,5 @@ import MemcpyProof.Hoare.Blocks.Tail2
 import MemcpyProof.Hoare.Blocks.Setups
 import MemcpyProof.Hoare.Blocks.AlignedLoop
 import MemcpyProof.Hoare.Blocks.Tail4Unaligned
+import MemcpyProof.Hoare.Blocks.UnalignedBody
+import MemcpyProof.Hoare.Blocks.BytePrefix
