@@ -8,10 +8,12 @@ Specification of memcpy.
 -/
 
 import MemcpyProof.Sem
+import MemcpyProof.Harness
 
 namespace MemcpyProof.Spec
 
 open MemcpyProof.Sem
+open MemcpyProof.Harness
 
 /-- Pure spec: copy `n` bytes from `src` to `dst` inside `mem`. -/
 def memcpyMem (dst src : UInt32) : Nat → Mem → Mem
@@ -21,9 +23,10 @@ def memcpyMem (dst src : UInt32) : Nat → Mem → Mem
     memcpyMem (dst + 1) (src + 1) k m'
 
 /-- A state `s` "looks like" a successful memcpy invocation finishing —
-i.e. it halted, and its memory matches the spec. -/
+i.e. it has returned (pc reached the saved return address) and its
+memory matches the spec. -/
 def specOk (initMem : Mem) (dst src : UInt32) (n : Nat) (final : State) : Prop :=
-  final.halted = true ∧ ∀ a : UInt32, final.mem a = (memcpyMem dst src n initMem) a
+  final.pc = retSentinel ∧ ∀ a : UInt32, final.mem a = (memcpyMem dst src n initMem) a
 
 /-- Decidable variant for `native_decide` proofs: only compare bytes over
 the finite copy region. -/
@@ -34,6 +37,6 @@ def specOkOnRange (initMem : Mem) (dst src : UInt32) (n : Nat) (final : State) :
     | k + 1 =>
       let a := dst + (n - i).toUInt32
       (final.mem a == (memcpyMem dst src n initMem) a) && checkRange k
-  final.halted && checkRange n
+  hasReturned final && checkRange n
 
 end MemcpyProof.Spec

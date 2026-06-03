@@ -31,33 +31,22 @@ def block_4byte : List Instr :=
   , Instr.addi 14 14 4
   ]
 
-/-! ## The composed Triple — chain the four per-instruction triples. -/
-
 theorem block_4byte_triple_composed :
     Triple block_4byte
-      (RComp (fun s s' => s.halted = false →
-                s' = advance (setReg s 11 (loadWord s (getReg s 14 + 0))))
-        (RComp (fun s s' => s.halted = false →
-                  s' = advance (storeWord s (getReg s 13 + 0) (getReg s 11)))
-          (RComp (fun s s' => s.halted = false →
-                    s' = advance (setReg s 13 (getReg s 13 + 4)))
-                 (fun s s' => s.halted = false →
-                    s' = advance (setReg s 14 (getReg s 14 + 4)))))) :=
+      (RComp (fun s s' => s' = advance (setReg s 11 (loadWord s (getReg s 14 + 0))))
+        (RComp (fun s s' => s' = advance (storeWord s (getReg s 13 + 0) (getReg s 11)))
+          (RComp (fun s s' => s' = advance (setReg s 13 (getReg s 13 + 4)))
+                 (fun s s' => s' = advance (setReg s 14 (getReg s 14 + 4)))))) :=
   (Triple_lw   11 14 0).append <|
   (Triple_sw   13 11 0).append <|
   (Triple_addi 13 13 4).append <|
   (Triple_addi 14 14 4)
 
-/-! ## The clean Triple, derived by weakening. -/
-
 /-- Clean relational post-condition for `block_4byte`. -/
 def R_block_4byte : State → State → Prop :=
   fun s s' =>
-    s.halted = false →
     let loaded : UInt32 := loadWord s (getReg s 14)
     s'.pc = s.pc + 16 ∧
-    s'.halted = false ∧
-    s'.haltAt = s.haltAt ∧
     getReg s' 11 = loaded ∧
     getReg s' 13 = getReg s 13 + 4 ∧
     getReg s' 14 = getReg s 14 + 4 ∧
@@ -67,23 +56,17 @@ def R_block_4byte : State → State → Prop :=
 
 theorem block_4byte_triple : Triple block_4byte R_block_4byte := by
   refine Triple.weaken block_4byte_triple_composed ?_
-  rintro s s' ⟨s1, h_s1, s2, h_s2, s3, h_s3, h_s'⟩ h_halted
-  -- Eliminate intermediates s1, s2, s3, s' with their explicit forms.
-  have e1 := h_s1 h_halted;             subst e1
-  have e2 := h_s2 (by simp [h_halted]); subst e2
-  have e3 := h_s3 (by simp [h_halted]); subst e3
-  have e' := h_s' (by simp [h_halted]); subst e'
-  refine ⟨?_, ?_, rfl, ?_, ?_, ?_, ?_, ?_⟩
+  rintro s s' ⟨s1, h_s1, s2, h_s2, s3, h_s3, h_s'⟩
+  subst h_s1; subst h_s2; subst h_s3; subst h_s'
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · show s.pc + 4 + 4 + 4 + 4 = s.pc + 16; bv_decide
-  · simp [h_halted]
   · simp (config := { decide := true })
   · simp (config := { decide := true })
   · simp (config := { decide := true })
   · intro r hr11 hr13 hr14
     simp (config := { decide := true })
       [setReg, Vector.getElem_set_ne, Ne.symm hr11, Ne.symm hr13, Ne.symm hr14]
-  · -- mem
-    simp (config := { decide := true })
+  · simp (config := { decide := true })
     unfold storeWord
     simp [storeByte]
 

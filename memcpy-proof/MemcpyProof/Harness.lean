@@ -35,11 +35,15 @@ def initial (dst src n : UInt32) (mem : Mem) : State :=
                   |>.set 10 dst         (by decide)
                   |>.set 11 src         (by decide)
                   |>.set 12 n           (by decide)
-  { regs := r, mem := mem, pc := vaddr, halted := false, haltAt := retSentinel }
+  { regs := r, mem := mem, pc := vaddr }
 
-/-- Run up to `fuel` steps. -/
+/-- Run up to `fuel` steps; stops when `pc = retSentinel` (i.e., the
+routine has returned). -/
 def runMemcpy (fuel : Nat) (dst src n : UInt32) (mem : Mem) : State :=
-  run memcpyCode fuel (initial dst src n mem)
+  run memcpyCode retSentinel fuel (initial dst src n mem)
+
+/-- "The routine has returned": `pc` matches the saved return address. -/
+def hasReturned (s : State) : Bool := s.pc == retSentinel
 
 /-- Convenience: install a list of bytes at `base..base+len` in memory. -/
 def installBytes (mem : Mem) (base : UInt32) (bs : List UInt8) : Mem :=

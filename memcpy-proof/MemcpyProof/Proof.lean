@@ -119,7 +119,7 @@ The general correctness statement we ultimately want is:
 ∀ (dst src n : UInt32) (mem : Mem),
   -- non-overlap and pointer-validity assumptions go here --
   let s := runMemcpy fuel dst src n mem
-  s.halted ∧ ∀ a, s.mem a = memcpyMem dst src n.toNat mem a
+  s.pc = retSentinel ∧ ∀ a, s.mem a = memcpyMem dst src n.toNat mem a
 ```
 
 Proving it at this scale requires a loop-invariant proof of a 259-instr
@@ -145,7 +145,7 @@ theorem memcpy_correct_general
         ¬ (dst.toNat ≤ a.toNat ∧ a.toNat < dst.toNat + n.toNat ∧
            src.toNat ≤ a.toNat ∧ a.toNat < src.toNat + n.toNat)) :
     let s := runMemcpy fuel dst src n mem
-    s.halted = true ∧
+    s.pc = retSentinel ∧
     ∀ a : UInt32, s.mem a = (memcpyMem dst src n.toNat mem) a := by
   sorry
 

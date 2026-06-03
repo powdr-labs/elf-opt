@@ -36,24 +36,17 @@ def RComp (R₁ R₂ : State → State → Prop) : State → State → Prop :=
 theorem Triple_nil (R : State → State → Prop) (h : ∀ s, R s s) : Triple [] R := by
   intro s; exact h s
 
-/-- A useful single-instruction triple: when not halted, the post-state
-    is `exec s i`.  (When halted, `runInstrs` returns `s` unchanged, so
-    a "the post-state is `exec s i`" claim is only sensible under the
-    not-halted hypothesis — hence the implication in the relation.) -/
-theorem Triple_single_not_halted (i : Instr) :
-    Triple [i] (fun s s' => s.halted = false → s' = exec s i) := by
-  intro s h_halted
-  show (if s.halted then s else runInstrs (exec s i) []) = exec s i
-  rw [h_halted]; rfl
+/-- The fundamental single-instruction triple: the post-state is `exec s i`. -/
+theorem Triple_single (i : Instr) :
+    Triple [i] (fun s s' => s' = exec s i) := by
+  intro s; rfl
 
-/-- Sequential composition (the textbook `seq` rule for relational Hoare).
-    `Triple b₁ R₁` and `Triple b₂ R₂` compose into `Triple (b₁ ++ b₂) (R₁;R₂)`. -/
+/-- Sequential composition (the textbook `seq` rule for relational Hoare). -/
 theorem Triple.append {b₁ b₂ : List Instr} {R₁ R₂ : State → State → Prop}
     (h₁ : Triple b₁ R₁) (h₂ : Triple b₂ R₂) :
     Triple (b₁ ++ b₂) (RComp R₁ R₂) := by
   intro s
   refine ⟨runInstrs s b₁, h₁ s, ?_⟩
-  show R₂ (runInstrs s b₁) (runInstrs s (b₁ ++ b₂))
   rw [runInstrs_append]
   exact h₂ (runInstrs s b₁)
 

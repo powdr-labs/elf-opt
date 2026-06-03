@@ -2,9 +2,12 @@
 RV32I small-step semantics.
 
 State:  32 GP registers (forcing x0=0 on read), byte-addressable memory
-        as a total function `UInt32 → UInt8`, program counter, and a
-        `halted` flag (set when `pc` equals the saved return address
-        on entry — i.e. `ret` has been executed).
+        as a total function `UInt32 → UInt8`, and a program counter.
+
+We do *not* carry a `halted` flag.  "Routine has returned" is a state
+predicate at the harness/CFG layer: `s.pc = retSentinel` for whatever
+`retSentinel` was loaded into `ra` on entry.  At the basic-block level
+(the Hoare-triple layer) execution is unconditional fold of `exec`.
 -/
 
 import MemcpyProof.RV32I
@@ -25,14 +28,9 @@ abbrev Regs := Vector UInt32 32
 export MemcpyProof.RV32I (Reg)
 
 structure State where
-  regs   : Regs
-  mem    : Mem
-  pc     : UInt32
-  /-- Set to true once execution returns from the routine — i.e. when
-  control transfers back to the `ra` value that was set on entry. -/
-  halted : Bool
-  /-- The return address we entered with; once `pc = haltAt`, we stop. -/
-  haltAt : UInt32
+  regs : Regs
+  mem  : Mem
+  pc   : UInt32
 
 @[inline] def getReg (s : State) (r : Reg) : UInt32 :=
   if r = 0 then 0 else s.regs[r]
@@ -77,8 +75,7 @@ def storeWord (s : State) (addr : UInt32) (v : UInt32) : State :=
   { s with pc := s.pc + 4 }
 
 @[reducible] def jumpTo (s : State) (target : UInt32) : State :=
-  if target == s.haltAt then { s with pc := target, halted := true }
-  else { s with pc := target }
+  { s with pc := target }
 
 @[reducible] def exec (s : State) (i : Instr) : State :=
   match i with
@@ -175,39 +172,46 @@ def storeWord (s : State) (addr : UInt32) (v : UInt32) : State :=
 or 0 outside the routine's range. -/
 abbrev CodeFn := UInt32 → UInt32
 
-@[inline] def step (code : CodeFn) (s : State) : State :=
-  if s.halted then s else exec s (decode (code s.pc))
+/-- One step.  Stops at `haltAt`: when `s.pc = haltAt`, the routine has
+returned and we leave the state alone.  This is the harness's
+termination criterion, *not* a state field. -/
+@[inline] def step (code : CodeFn) (haltAt : UInt32) (s : State) : State :=
+  if s.pc = haltAt then s else exec s (decode (code s.pc))
 
-def run (code : CodeFn) : Nat → State → State
+def run (code : CodeFn) (haltAt : UInt32) : Nat → State → State
   | 0, s     => s
-  | n+1, s   => if s.halted then s else run code n (step code s)
+  | n+1, s   => if s.pc = haltAt then s else run code haltAt n (step code haltAt s)
 
-@[simp] theorem run_zero (code : CodeFn) (s : State) : run code 0 s = s := rfl
+@[simp] theorem run_zero (code : CodeFn) (haltAt : UInt32) (s : State) :
+    run code haltAt 0 s = s := rfl
 
-theorem run_halted (code : CodeFn) (s : State) (n : Nat) (h : s.halted = true) :
-    run code n s = s := by
+theorem run_done (code : CodeFn) (haltAt : UInt32) (s : State) (n : Nat)
+    (h : s.pc = haltAt) :
+    run code haltAt n s = s := by
   induction n with
   | zero => rfl
   | succ n ih => simp [run, h]
 
-/-- Unfold one step of `run` when the state is not halted. -/
-theorem run_succ (code : CodeFn) (s : State) (h : s.halted = false) (n : Nat) :
-    run code (n+1) s = run code n (step code s) := by
-  show (if s.halted = true then s else run code n (step code s)) = run code n (step code s)
-  rw [h]; rfl
+/-- Unfold one step of `run` when we have not yet reached `haltAt`. -/
+theorem run_succ (code : CodeFn) (haltAt : UInt32) (s : State)
+    (h : s.pc ≠ haltAt) (n : Nat) :
+    run code haltAt (n+1) s = run code haltAt n (step code haltAt s) := by
+  show (if s.pc = haltAt then s else run code haltAt n (step code haltAt s))
+       = run code haltAt n (step code haltAt s)
+  rw [if_neg h]
 
 /-- `run` composes over Nat addition. -/
-theorem run_add (code : CodeFn) (a b : Nat) (s : State) :
-    run code (a + b) s = run code b (run code a s) := by
+theorem run_add (code : CodeFn) (haltAt : UInt32) (a b : Nat) (s : State) :
+    run code haltAt (a + b) s = run code haltAt b (run code haltAt a s) := by
   induction a generalizing s with
-  | zero => show run code (0 + b) s = run code b (run code 0 s); simp
+  | zero => show run code haltAt (0 + b) s = run code haltAt b (run code haltAt 0 s); simp
   | succ a ih =>
-    show run code (a + 1 + b) s = run code b (run code (a + 1) s)
+    show run code haltAt (a + 1 + b) s = run code haltAt b (run code haltAt (a + 1) s)
     rw [show a + 1 + b = (a + b) + 1 from by omega]
-    show (if s.halted = true then s else run code (a + b) (step code s))
-        = run code b (if s.halted = true then s else run code a (step code s))
-    by_cases h : s.halted = true
-    · simp [h, run_halted _ _ _ h]
-    · simp [h]; exact ih (step code s)
+    show (if s.pc = haltAt then s else run code haltAt (a + b) (step code haltAt s))
+        = run code haltAt b (if s.pc = haltAt then s else run code haltAt a (step code haltAt s))
+    by_cases h : s.pc = haltAt
+    · simp [h, run_done _ _ _ _ h]
+    · simp [h]; exact ih (step code haltAt s)
 
 end MemcpyProof.Sem

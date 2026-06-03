@@ -20,7 +20,7 @@ def runOne (n : Nat) (srcAlign dstAlign : Nat) : IO Unit := do
   let final := runMemcpy 200000 dst src n.toUInt32 mem
   let got := readBytes final.mem dst n
   let ok := got == srcBytes
-  IO.println s!"n={n} src+{srcAlign} dst+{dstAlign} -> halted={final.halted} steps≤200000 ok={ok}"
+  IO.println s!"n={n} src+{srcAlign} dst+{dstAlign} -> returned={hasReturned final} steps≤200000 ok={ok}"
   if !ok then
     IO.println s!"  expected: {srcBytes}"
     IO.println s!"  got     : {got}"
