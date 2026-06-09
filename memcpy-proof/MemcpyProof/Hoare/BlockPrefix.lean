@@ -40,20 +40,17 @@ theorem block_align_check_triple_composed :
 
 def R_block_align_check : State → State → Prop :=
   fun s s' =>
-    let v13 : UInt32 := if (getReg s 11 &&& 3) < 1 then 1 else 0
-    let v14 : UInt32 := if getReg s 12 < 1 then 1 else 0
+    let v13 : Bool := (getReg s 11 &&& 3) == 0
+    let v14 : Bool := getReg s 12 == 0
     s'.pc = s.pc + 16 ∧
-    getReg s' 13 = v13 ||| v14 ∧
-    getReg s' 14 = v14 ∧
+    getReg s' 13 = (v13 || v14).toUInt32 ∧
+    getReg s' 14 = v14.toUInt32 ∧
     (∀ r : Fin 32, r.val ≠ 13 → r.val ≠ 14 → s'.regs[r.val] = s.regs[r.val]) ∧
     s'.mem = s.mem
 
 theorem block_align_check_triple : Triple block_align_check R_block_align_check := by
   refine Triple.weaken block_align_check_triple_composed ?_
   rintro s s' ⟨_, rfl, _, rfl, _, rfl, rfl⟩
-  have h_pc : s.pc + 4 + 4 + 4 + 4 = s.pc + 16 := by bv_decide
-  simp [R_block_align_check, h_pc]
-  intro r hr13 hr14
-  simp [setReg, Ne.symm hr13, Ne.symm hr14]
+  grind [Bool.toUInt32, R_block_align_check]
 
 end MemcpyProof.Hoare

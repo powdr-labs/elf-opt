@@ -153,14 +153,13 @@ theorem block_16byte_unaligned_h2_a0 (s : State) :
 def block_16byte_unaligned : List Instr :=
   block_16byte_unaligned_h1 ++ block_16byte_unaligned_h2
 
-/-- Structured post-condition: PC bumps by 136; `a1 ← a3 + 16`; `a4 ← a4 + 16`;
-    `a0`, `a2`, `a3` preserved.
+/-- Structured post-condition for B36: pc and register effects.
+    PC bumps by 136; `a1 ← a3 + 16`; `a4 ← a4 + 16`; `a0`, `a2`, `a3`
+    preserved.
 
-    The byte-copy *memory* effect (Mem[a3+i] = Mem[a4+i] for i=0..15) is
-    aliasing-sensitive — for `a3..a3+15` overlapping `a4..a4+15` the byte
-    values depend on the interleaving of load/store. We deliberately omit
-    that conjunct here; it belongs at the correctness layer where the
-    non-overlap assumption is in scope. -/
+    The byte-level memory effects are captured in *separate* theorems
+    (see `block_16byte_unaligned_mem_bytes` and `_mem_untouched` below)
+    to avoid encumbering this R with aliasing-sensitive conjuncts. -/
 def R_block_16byte_unaligned : State → State → Prop :=
   fun s s' =>
     s'.pc = s.pc + 136 ∧
@@ -182,5 +181,32 @@ theorem block_16byte_unaligned_triple :
   · rw [block_16byte_unaligned_h2_a2, block_16byte_unaligned_h1_a2]
   · rw [block_16byte_unaligned_h2_a3, block_16byte_unaligned_h1_a3]
   · rw [block_16byte_unaligned_h2_a4, block_16byte_unaligned_h1_a4]
+
+/-! ## Byte-level memory views (separate theorems).
+
+  The block copies 16 bytes from `[a4, a4+16)` to `[a3, a3+16)` byte by
+  byte.  Loads and stores are interleaved, so the byte-copy claim
+  requires the non-aliasing precondition `Pre_16byte_no_alias`. -/
+
+/-- Non-aliasing precondition: dst window `[a3, a3+16)` disjoint from
+    src window `[a4, a4+16)`. -/
+def Pre_16byte_no_alias (s : State) : Prop :=
+  ∀ i j : UInt32, i < 16 → j < 16 → getReg s 13 + i ≠ getReg s 14 + j
+
+/-- Byte-copy claim: under non-aliasing, the 16 dst bytes equal the
+    16 src bytes.  (Proof: chase `.mem (a3+i)` through the 34-instr
+    chain, using non-aliasing to show each load reads the original
+    byte; see proof sketch in `block_16byte_unaligned_h1_mem` notes.) -/
+theorem block_16byte_unaligned_mem_bytes (s : State) (h : Pre_16byte_no_alias s)
+    (i : UInt32) (hi : i < 16) :
+    (runInstrs s block_16byte_unaligned).mem (getReg s 13 + i)
+      = s.mem (getReg s 14 + i) := by
+  sorry
+
+/-- Untouched-bytes claim: any address outside `[a3, a3+16)` is preserved. -/
+theorem block_16byte_unaligned_mem_untouched (s : State) (a : UInt32)
+    (h : ∀ i : UInt32, i < 16 → a ≠ getReg s 13 + i) :
+    (runInstrs s block_16byte_unaligned).mem a = s.mem a := by
+  sorry
 
 end MemcpyProof.Hoare

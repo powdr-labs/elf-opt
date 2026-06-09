@@ -84,6 +84,24 @@ theorem Triple_sb (rs1 rs2 : Reg) (imm : UInt32) :
       (fun s s' => s' = advance (storeByte s (getReg s rs1 + imm) (getReg s rs2).toUInt8)) := by
   intro s; exact (exec_sb s rs1 rs2 imm).symm
 
+theorem Triple_bne (rs1 rs2 : Reg) (imm : UInt32) :
+    Triple [Instr.bne rs1 rs2 imm]
+      (fun s s' => s' =
+        if getReg s rs1 != getReg s rs2 then jumpTo s (s.pc + imm) else advance s) := by
+  intro s; exact (exec_bne s rs1 rs2 imm).symm
+
+theorem Triple_beq (rs1 rs2 : Reg) (imm : UInt32) :
+    Triple [Instr.beq rs1 rs2 imm]
+      (fun s s' => s' =
+        if getReg s rs1 == getReg s rs2 then jumpTo s (s.pc + imm) else advance s) := by
+  intro s; exact (exec_beq s rs1 rs2 imm).symm
+
+theorem Triple_bltu (rs1 rs2 : Reg) (imm : UInt32) :
+    Triple [Instr.bltu rs1 rs2 imm]
+      (fun s s' => s' =
+        if getReg s rs1 < getReg s rs2 then jumpTo s (s.pc + imm) else advance s) := by
+  intro s; exact (exec_bltu s rs1 rs2 imm).symm
+
 theorem Triple_jal (rd : Reg) (imm : UInt32) :
     Triple [Instr.jal rd imm]
       (fun s s' => s' = jumpTo (setReg s rd (s.pc + 4)) (s.pc + imm)) := by

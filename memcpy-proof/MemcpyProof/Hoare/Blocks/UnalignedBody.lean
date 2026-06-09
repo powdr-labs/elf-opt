@@ -255,4 +255,61 @@ def block_F_unaligned2 : List Instr := mk_block_F_unaligned 8 24
 /-- B23 — unaligned-by-3 16-byte loop body (PCs 0x200b28..0x200b80). -/
 def block_F_unaligned3 : List Instr := mk_block_F_unaligned 16 16
 
+/-! ## Byte-level memory views (per-iteration).
+
+  Each iteration writes 16 bytes to `[a1, a1+16)` from src bytes around
+  `a3`.  The byte at offset 0 of dst comes from `a5`'s high bits (the
+  "carry" from the previous iteration's load), and bytes 1..15 come from
+  4 fresh `loadWord`s.  Under the carry-invariant
+  `a5 = loadWord s (a3 - 16)`, the per-iter byte-level effect is:
+
+    B9  (sR=24, sL=8):   mem'[a1+i] = mem[a3 - 13 + i]  for i < 16
+    B20 (sR=8,  sL=24):  mem'[a1+i] = mem[a3 - 15 + i]  for i < 16
+    B23 (sR=16, sL=16):  mem'[a1+i] = mem[a3 - 14 + i]  for i < 16
+
+  Proof sketch (sorried below): unfold the 5-chunk R, apply
+  `storeWord_mem_byte` to each of the 4 output words, and use the
+  carry invariant + `bv_decide` to relate each `(out_k >>> k*8).toUInt8`
+  to the corresponding `s.mem` byte.
+
+  Plus an invariant-preservation lemma showing `a5` after iter equals
+  `loadWord s' (a3' - 16)` (= `loadWord s a3`, since a5 ← lw at a3 in c3
+  and a3' = a3 + 16). -/
+
+/-- Carry precondition: `a5` holds the word at `a3 - 16` (= the previous
+    iter's "current word", or the byte-prefix-aligned word for iter 1). -/
+def Pre_unaligned_carry (s : State) : Prop :=
+  getReg s 15 = loadWord s (getReg s 13 - 16)
+
+theorem block_F_unaligned1_mem_bytes (s : State) (h : Pre_unaligned_carry s)
+    (i : UInt32) (hi : i < 16) :
+    (runInstrs s block_F_unaligned1).mem (getReg s 11 + i)
+      = s.mem (getReg s 13 - 13 + i) := by
+  sorry
+
+theorem block_F_unaligned2_mem_bytes (s : State) (h : Pre_unaligned_carry s)
+    (i : UInt32) (hi : i < 16) :
+    (runInstrs s block_F_unaligned2).mem (getReg s 11 + i)
+      = s.mem (getReg s 13 - 15 + i) := by
+  sorry
+
+theorem block_F_unaligned3_mem_bytes (s : State) (h : Pre_unaligned_carry s)
+    (i : UInt32) (hi : i < 16) :
+    (runInstrs s block_F_unaligned3).mem (getReg s 11 + i)
+      = s.mem (getReg s 13 - 14 + i) := by
+  sorry
+
+/-- Carry preservation: after one iter, `a5'` holds `loadWord s' (a3' - 16)`.
+    Since `a3' = a3 + 16` and `a5' = loadWord s a3` (set in chunk c3), we
+    have `loadWord s' (a3' - 16) = loadWord s a3`.  This relies on no
+    storeWord in the iter touching the region `[a3, a3+4)` — i.e., that
+    `[a1, a1+16)` ∩ `[a3, a3+4)` is empty (a non-aliasing fact, which is
+    part of the standard memcpy `restrict` precondition). -/
+theorem mk_block_F_unaligned_carry_preserved (sR sL : UInt32) (s : State)
+    (h_no_alias : ∀ i j : UInt32, i < 16 → j < 4 →
+        getReg s 11 + i ≠ getReg s 13 + j) :
+    getReg (runInstrs s (mk_block_F_unaligned sR sL)) 15
+      = loadWord s (getReg s 13) := by
+  sorry
+
 end MemcpyProof.Hoare

@@ -64,4 +64,17 @@ theorem block_8byte_triple : Triple block_8byte R_block_8byte := by
     simp [setReg, Ne.symm hr11, Ne.symm hr13, Ne.symm hr14, Ne.symm hr15]
   · unfold storeWord; simp [storeByte]
 
+/-- Byte-level view of `block_8byte`'s memory effect: the 8 stored bytes
+    equal the 8 src bytes.  Derivable from `R_block_8byte`'s storeWord
+    chain via `storeWord_mem_byte` + `storeWord_mem_other` (StateLemmas),
+    plus `bv_decide` to relate each `loadWord` byte to `loadByte`.
+
+    Proof sketched: case-split `i ∈ {0..7}`; for low half use
+    `storeWord_mem_other` to bypass the outer storeWord, then
+    `storeWord_mem_byte` + `unfold loadWord; bv_decide`; high half is
+    symmetric with the outer storeWord. -/
+theorem block_8byte_mem_bytes (s : State) (i : UInt32) (hi : i < 8) :
+    (runInstrs s block_8byte).mem (getReg s 13 + i) = s.mem (getReg s 14 + i) := by
+  sorry
+
 end MemcpyProof.Hoare

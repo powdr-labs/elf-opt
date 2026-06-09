@@ -32,10 +32,10 @@ structure State where
   mem  : Mem
   pc   : UInt32
 
-@[inline] def getReg (s : State) (r : Reg) : UInt32 :=
+@[inline, grind =] def getReg (s : State) (r : Reg) : UInt32 :=
   if r = 0 then 0 else s.regs[r]
 
-@[inline] def setReg (s : State) (r : Reg) (v : UInt32) : State :=
+@[inline, grind =] def setReg (s : State) (r : Reg) (v : UInt32) : State :=
   if r = 0 then s
   else { s with regs := s.regs.set r.val v r.isLt }
 

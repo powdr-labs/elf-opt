@@ -64,4 +64,11 @@ theorem block_4byte_triple : Triple block_4byte R_block_4byte := by
     simp [setReg, Ne.symm hr11, Ne.symm hr13, Ne.symm hr14]
   · unfold storeWord; simp [storeByte]
 
+/-- Byte-level view of `block_4byte`'s memory effect: the 4 stored bytes
+    equal the 4 src bytes.  Derivable from `R_block_4byte`'s single
+    `storeWord` via `storeWord_mem_byte` + `unfold loadWord`. -/
+theorem block_4byte_mem_bytes (s : State) (i : UInt32) (hi : i < 4) :
+    (runInstrs s block_4byte).mem (getReg s 13 + i) = s.mem (getReg s 14 + i) := by
+  sorry
+
 end MemcpyProof.Hoare

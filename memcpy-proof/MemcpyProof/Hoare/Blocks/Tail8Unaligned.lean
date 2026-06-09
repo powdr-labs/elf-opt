@@ -1,15 +1,13 @@
 /-
 B38 — 8-byte byte-by-byte unaligned tail (PCs 0x200cac..0x200cf0, 18 instr).
 
-Copies 8 bytes from `[a4]` to `[a3]` one byte at a time using 3 rolling
-scratch registers (a1, a5, a6), then advances `a4` by 8 and stages
-`a1 ← a3 + 8` for whatever follows.
+Copies 8 bytes from `[a4]` to `[a3]` one byte at a time, advances `a4`
+by 8, and stages `a1 ← a3 + 8`.
 
-Because lb's appear *after* sb's within the block, an unconditional clean
-post-condition would need to track aliasing.  We sidestep that by giving
-the **strongest postcondition** form `s' = runInstrs s block`, and then
-proving a few high-level extraction lemmas (pc bump, key register values,
-frame) by direct simp on the explicit exec-chain.
+Triple's structured `R` captures the unconditional register/pc facts.
+The byte-copy memory effect is aliasing-sensitive (the loop reads from
+addresses some of which were just stored to) and is deferred to the
+correctness layer where a non-overlap assumption is in scope.
 -/
 
 import MemcpyProof.Hoare.InstrTriples
@@ -42,14 +40,6 @@ def block_8byte_unaligned : List Instr :=
   , Instr.sb   13 15 7
   ]
 
-/-- The semantics of B38 in strongest-postcondition form. -/
-theorem block_8byte_unaligned_triple :
-    Triple block_8byte_unaligned
-      (fun s s' => s' = runInstrs s block_8byte_unaligned) :=
-  Triple_sp _
-
-/-! ## Extraction lemmas — useful facts about the post-state. -/
-
 private theorem unfold_post (s : State) :
     runInstrs s block_8byte_unaligned
       = exec (exec (exec (exec (exec (exec (exec (exec (exec
@@ -62,30 +52,50 @@ private theorem unfold_post (s : State) :
             (Instr.addi 14 14 8)) (Instr.addi 11 13 8)) (Instr.sb 13 15 7) := by
   rfl
 
-theorem block_8byte_unaligned_pc (s : State) :
-    (runInstrs s block_8byte_unaligned).pc = s.pc + 72 := by
-  rw [unfold_post]
-  show s.pc + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 = _
-  bv_decide
+/-- Structured post-condition: pc bumps by 72; `a1 ← a3 + 8`; `a4 ← a4 + 8`;
+    `a0`, `a2`, `a3` preserved.  Byte-level memory views are in separate
+    theorems below (see `block_8byte_unaligned_mem_bytes`). -/
+def R_block_8byte_unaligned : State → State → Prop :=
+  fun s s' =>
+    s'.pc = s.pc + 72 ∧
+    getReg s' 10 = getReg s 10 ∧
+    getReg s' 11 = getReg s 13 + 8 ∧
+    getReg s' 12 = getReg s 12 ∧
+    getReg s' 13 = getReg s 13 ∧
+    getReg s' 14 = getReg s 14 + 8
 
-theorem block_8byte_unaligned_a1 (s : State) :
-    getReg (runInstrs s block_8byte_unaligned) 11 = getReg s 13 + 8 := by
-  rw [unfold_post]; simp
+theorem block_8byte_unaligned_triple :
+    Triple block_8byte_unaligned R_block_8byte_unaligned := by
+  intro s
+  rw [show runInstrs s block_8byte_unaligned = _ from unfold_post s]
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  · show s.pc + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 = _
+    bv_decide
+  · simp
+  · simp
+  · simp
+  · simp
+  · simp
 
-theorem block_8byte_unaligned_a3 (s : State) :
-    getReg (runInstrs s block_8byte_unaligned) 13 = getReg s 13 := by
-  rw [unfold_post]; simp
+/-! ## Byte-level memory views (separate theorems). -/
 
-theorem block_8byte_unaligned_a4 (s : State) :
-    getReg (runInstrs s block_8byte_unaligned) 14 = getReg s 14 + 8 := by
-  rw [unfold_post]; simp
+/-- Non-aliasing precondition: dst window `[a3, a3+8)` disjoint from
+    src window `[a4, a4+8)`. -/
+def Pre_8byte_no_alias (s : State) : Prop :=
+  ∀ i j : UInt32, i < 8 → j < 8 → getReg s 13 + i ≠ getReg s 14 + j
 
-theorem block_8byte_unaligned_a2 (s : State) :
-    getReg (runInstrs s block_8byte_unaligned) 12 = getReg s 12 := by
-  rw [unfold_post]; simp
+/-- Byte-copy claim: under non-aliasing, the 8 dst bytes equal the
+    8 src bytes. -/
+theorem block_8byte_unaligned_mem_bytes (s : State) (h : Pre_8byte_no_alias s)
+    (i : UInt32) (hi : i < 8) :
+    (runInstrs s block_8byte_unaligned).mem (getReg s 13 + i)
+      = s.mem (getReg s 14 + i) := by
+  sorry
 
-theorem block_8byte_unaligned_a0 (s : State) :
-    getReg (runInstrs s block_8byte_unaligned) 10 = getReg s 10 := by
-  rw [unfold_post]; simp
+/-- Untouched-bytes claim: any address outside `[a3, a3+8)` is preserved. -/
+theorem block_8byte_unaligned_mem_untouched (s : State) (a : UInt32)
+    (h : ∀ i : UInt32, i < 8 → a ≠ getReg s 13 + i) :
+    (runInstrs s block_8byte_unaligned).mem a = s.mem a := by
+  sorry
 
 end MemcpyProof.Hoare
