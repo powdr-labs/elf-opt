@@ -55,7 +55,7 @@ def R_loop_setup : State → State → Prop :=
     s'.pc = s.pc + 8 ∧
     getReg s' 15 = getReg s 11 + 1 ∧
     getReg s' 16 = getReg s 10 ∧
-    (∀ r : Fin 32, r.val ≠ 15 → r.val ≠ 16 → s'.regs[r.val] = s.regs[r.val]) ∧
+    (∀ r : Fin 32, r.val ≠ 15 → r.val ≠ 16 → getReg s' r = getReg s r) ∧
     s'.mem = s.mem
 
 theorem loop_setup_triple :
@@ -103,7 +103,7 @@ def R_loop_copy_byte : State → State → Prop :=
     getReg s' 14 = a1 + 1 ∧
     getReg s' 17 = signExt (loadByte s a1).toUInt32 7 ∧
     (∀ r : Fin 32, r.val ≠ 13 → r.val ≠ 14 → r.val ≠ 17 →
-       s'.regs[r.val] = s.regs[r.val]) ∧
+       getReg s' r = getReg s r) ∧
     s'.mem = (storeByte s a6 (loadByte s a1)).mem
 
 theorem loop_copy_byte_triple :
@@ -151,7 +151,7 @@ def R_loop_predicate : State → State → Prop :=
     getReg s' 16 = a2_tst.toUInt32 ∧
     getReg s' 17 = (a1_tst && (getReg s' 12) != 0).toUInt32 ∧
     (∀ r : Fin 32, r.val ≠ 11 → r.val ≠ 12 → r.val ≠ 16 → r.val ≠ 17 →
-       s'.regs[r.val] = s.regs[r.val]) ∧
+       getReg s' r = getReg s r) ∧
     s'.mem = s.mem
 
 theorem loop_predicate_triple :
@@ -165,8 +165,7 @@ theorem loop_predicate_triple :
   refine ⟨?_, ?_⟩
   · generalize h11 : getReg s 15 = a15
     bv_decide
-  · intro r h11 h12 h16 h17
-    simp [setReg, Ne.symm h11, Ne.symm h12, Ne.symm h16, Ne.symm h17]
+  · simp_all
 
 /-! ### `loop_branch`: final pointer bumps + the back-branch.
 
@@ -205,7 +204,7 @@ def R_loop_branch : State → State → Prop :=
     getReg s' 15 = getReg s 15 + 1 ∧
     getReg s' 16 = getReg s 13 ∧
     (∀ r : Fin 32, r.val ≠ 11 → r.val ≠ 15 → r.val ≠ 16 →
-       s'.regs[r.val] = s.regs[r.val]) ∧
+       getReg s' r = getReg s r) ∧
     s'.mem = s.mem
 
 theorem loop_branch_triple :
@@ -218,5 +217,60 @@ theorem loop_branch_triple :
   · simp [R_loop_branch, h]
     grind
 
+/-! ## The loop body: `loop_copy_byte ++ loop_predicate ++ loop_branch`.
+
+  These three blocks together comprise the byte-prefix loop body that
+  runs every iteration (with `loop_setup` running once beforehand).
+  After the body, the bne in `loop_branch` either loops back to the
+  start of `loop_copy_byte` (if `a7 ≠ 0`) or falls through to whatever
+  follows the loop. -/
+
+def loop_body : List Instr := loop_copy_byte ++ loop_predicate ++ loop_branch
+
+def loop_body_triple_composed :=
+  loop_copy_byte_triple.append <|
+  loop_predicate_triple.append <|
+  loop_branch_triple
+
+/-- Helper: lift a `regs[r.val] = regs[r.val]` frame fact to `getReg`
+    form, for any non-zero literal register. -/
+private theorem getReg_eq_of_regs_eq {s₁ s₂ : State} {r : Reg} (h0 : r ≠ 0)
+    (h : s₁.regs[r.val] = s₂.regs[r.val]) :
+    getReg s₁ r = getReg s₂ r := by
+  unfold getReg; rw [if_neg h0, if_neg h0]; exact h
+
+/-- Post-condition of `loop_body`. -/
+def R_loop_body : State → State → Prop :=
+  fun s s' =>
+    let a1 := getReg s 11
+    let a2 := getReg s 12
+    let a5 := getReg s 15
+    let a6 := getReg s 16
+    let a2' : UInt32 := a2 - 1
+    let a1_tst : Bool := (a5 &&& 3) != 0
+    let a2_tst : Bool := a2' != 0
+    let taken : Bool := a1_tst && a2_tst
+    s'.pc = (if taken then s.pc else s.pc + 52) ∧
+    getReg s' 11 = a1 + 1 ∧
+    getReg s' 12 = a2' ∧
+    getReg s' 13 = a6 + 1 ∧
+    getReg s' 14 = a1 + 1 ∧
+    getReg s' 15 = a5 + 1 ∧
+    getReg s' 16 = a6 + 1 ∧
+    getReg s' 17 = taken.toUInt32 ∧
+    (∀ r : Fin 32, r.val ≠ 11 → r.val ≠ 12 → r.val ≠ 13 → r.val ≠ 14 →
+       r.val ≠ 15 → r.val ≠ 16 → r.val ≠ 17 →
+       getReg s' r = getReg s r) ∧
+    s'.mem = (storeByte s a6 (loadByte s a1)).mem
+
+theorem loop_body_triple :
+    Triple loop_body R_loop_body := by
+  refine Triple.weaken loop_body_triple_composed ?_
+  rintro s s' ⟨t1, h1, t2, h2, h3⟩
+  simp only [R_loop_copy_byte] at h1
+  simp only [R_loop_predicate] at h2
+  simp only [R_loop_branch] at h3
+  simp_all [R_loop_body, Bool.toUInt32]
+  grind
 
 end MemcpyProof.Hoare

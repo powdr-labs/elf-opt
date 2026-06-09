@@ -98,15 +98,16 @@ discharges them automatically. -/
 
 /-- Reading a different register (frame). -/
 @[simp] theorem getReg_setReg_other (s : State) (r r' : Reg) (v : UInt32)
-    (h_ne : r ≠ r') (h0 : r' ≠ 0) :
+    (h_ne : r ≠ r') :
     getReg (setReg s r v) r' = getReg s r' := by
   unfold getReg setReg
-  rw [if_neg h0]
-  split
-  · rfl
-  · show (s.regs.set r.val v r.isLt)[r'.val] = s.regs[r'.val]
-    apply Vector.getElem_set_ne
-    intro contra; exact h_ne (Fin.ext contra)
+  grind
+
+@[simp] theorem getReg_setReg_other_val {s : State} {r r' : Reg} {v : UInt32}
+    (h_ne : r'.val ≠ r.val) :
+    getReg (setReg s r v) r' = getReg s r' := by
+  unfold getReg setReg
+  grind
 
 /-! ## Memory accessors only depend on `.mem`, which `advance`/`setReg`
 preserve. -/
