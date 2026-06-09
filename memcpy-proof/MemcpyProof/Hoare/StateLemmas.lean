@@ -222,9 +222,13 @@ theorem storeWord_mem_other (s : State) (a v a' : UInt32)
 /-- Sign-extending a UInt8 (via `.toUInt32`, signBit = 7) then truncating
     back to UInt8 is the identity.  The sign extension only sets bits
     8–31; the low 8 bits are preserved, and `.toUInt8` returns them. -/
-@[simp] theorem signExt_byte_toUInt8 (b : UInt8) :
+@[simp, grind =] theorem signExt_byte_toUInt8 (b : UInt8) :
     (signExt b.toUInt32 7).toUInt8 = b := by
   show ((b.toUInt32 ^^^ (1 <<< (7 : UInt32))) - (1 <<< (7 : UInt32))).toUInt8 = b
+  bv_decide
+
+@[simp, grind =] theorem signExt_UInt8_toUInt8 (b : UInt8) :
+  (b ^^^ (1 <<< (7 : UInt8))) - (1 <<< (7 : UInt8)) = b := by
   bv_decide
 
 /-! ## `storeWord` — preserves all fields except `mem`. -/

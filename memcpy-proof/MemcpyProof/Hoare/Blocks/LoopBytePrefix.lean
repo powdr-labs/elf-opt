@@ -206,7 +206,7 @@ def loop_byte_prefix_iter_n : Nat → List Instr
 
 /-- Full loop execution: 2-instr setup + K iterations of (main + bne). -/
 def loop_byte_prefix_full_run (K : Nat) : List Instr :=
-  block_byte_prefix_setup ++ loop_byte_prefix_iter_n K
+  loop_setup ++ loop_byte_prefix_iter_n K
 
 /-- Full-loop post-condition.  No `let`-bindings to avoid whnf
     expansion issues during typechecking. -/
@@ -261,31 +261,31 @@ theorem K_cases (s : State) (h_pre : Pre_loop_byte_prefix s) :
     `R_loop_byte_prefix_full` hold (specialized to K = 1). -/
 theorem loop_K1_correct (s : State) (h_pre : Pre_loop_byte_prefix s)
     (h_K1 : loop_byte_prefix_count s = 1) :
-    (runInstrs s (block_byte_prefix_setup ++ loop_byte_prefix)).pc = s.pc + 60 ∧
-    getReg (runInstrs s (block_byte_prefix_setup ++ loop_byte_prefix)) 17 = 0 ∧
-    getReg (runInstrs s (block_byte_prefix_setup ++ loop_byte_prefix)) 11
+    (runInstrs s (loop_setup ++ loop_byte_prefix)).pc = s.pc + 60 ∧
+    getReg (runInstrs s (loop_setup ++ loop_byte_prefix)) 17 = 0 ∧
+    getReg (runInstrs s (loop_setup ++ loop_byte_prefix)) 11
       = getReg s 11 + 1 ∧
-    getReg (runInstrs s (block_byte_prefix_setup ++ loop_byte_prefix)) 12
+    getReg (runInstrs s (loop_setup ++ loop_byte_prefix)) 12
       = getReg s 12 - 1 ∧
-    getReg (runInstrs s (block_byte_prefix_setup ++ loop_byte_prefix)) 13
+    getReg (runInstrs s (loop_setup ++ loop_byte_prefix)) 13
       = getReg s 10 + 1 ∧
-    getReg (runInstrs s (block_byte_prefix_setup ++ loop_byte_prefix)) 14
+    getReg (runInstrs s (loop_setup ++ loop_byte_prefix)) 14
       = getReg s 11 + 1 ∧
-    getReg (runInstrs s (block_byte_prefix_setup ++ loop_byte_prefix)) 16
+    getReg (runInstrs s (loop_setup ++ loop_byte_prefix)) 16
       = getReg s 10 + 1 ∧
     (∀ r : Fin 32, r.val ≠ 11 → r.val ≠ 12 → r.val ≠ 13 → r.val ≠ 14 →
                    r.val ≠ 15 → r.val ≠ 16 → r.val ≠ 17 →
-      (runInstrs s (block_byte_prefix_setup ++ loop_byte_prefix)).regs[r.val]
+      (runInstrs s (loop_setup ++ loop_byte_prefix)).regs[r.val]
         = s.regs[r.val]) ∧
     (∀ i : UInt32, i < 1 →
-      (runInstrs s (block_byte_prefix_setup ++ loop_byte_prefix)).mem (getReg s 10 + i)
+      (runInstrs s (loop_setup ++ loop_byte_prefix)).mem (getReg s 10 + i)
         = s.mem (getReg s 11 + i)) ∧
     (∀ a : UInt32, (∀ i : UInt32, i < 1 → a ≠ getReg s 10 + i) →
-      (runInstrs s (block_byte_prefix_setup ++ loop_byte_prefix)).mem a = s.mem a) := by
+      (runInstrs s (loop_setup ++ loop_byte_prefix)).mem a = s.mem a) := by
   -- Compose setup_triple + one_iter_triple.
-  have h_R := (block_byte_prefix_setup_triple.append loop_byte_prefix_one_iter_triple) s
+  have h_R := (loop_setup_triple.append loop_byte_prefix_one_iter_triple) s
   obtain ⟨t_setup, h_setup, h_iter⟩ := h_R
-  simp only [R_block_byte_prefix_setup] at h_setup
+  simp only [R_loop_setup] at h_setup
   simp only [R_loop_byte_prefix_one_iter] at h_iter
   obtain ⟨h_setup_pc, h_setup_15, h_setup_16, h_setup_frame, h_setup_mem⟩ := h_setup
   obtain ⟨h_iter_pc, h_iter_11, h_iter_12, h_iter_13, h_iter_14, _, h_iter_16, h_iter_17,
@@ -331,7 +331,7 @@ theorem loop_K1_correct (s : State) (h_pre : Pre_loop_byte_prefix s)
   · -- frame
     intro r hr11 hr12 hr13 hr14 hr15 hr16 hr17
     -- After iter, regs[r] = t_setup.regs[r]; after setup, t_setup.regs[r] = s.regs[r].
-    have h1 : (runInstrs s (block_byte_prefix_setup ++ loop_byte_prefix)).regs[r.val]
+    have h1 : (runInstrs s (loop_setup ++ loop_byte_prefix)).regs[r.val]
             = t_setup.regs[r.val] :=
       h_iter_frame r hr11 hr12 hr13 hr14 hr15 hr16 hr17
     have h2 : t_setup.regs[r.val] = s.regs[r.val] :=
@@ -368,28 +368,28 @@ theorem loop_K1_correct (s : State) (h_pre : Pre_loop_byte_prefix s)
     at `a0`, and `a0 ≠ a1 + 1` by non-aliasing). -/
 theorem loop_K2_correct (s : State) (h_pre : Pre_loop_byte_prefix s)
     (h_K2 : loop_byte_prefix_count s = 2) :
-    (runInstrs s (block_byte_prefix_setup ++ (loop_byte_prefix ++ loop_byte_prefix))).pc
+    (runInstrs s (loop_setup ++ (loop_byte_prefix ++ loop_byte_prefix))).pc
       = s.pc + 60 ∧
-    getReg (runInstrs s (block_byte_prefix_setup ++ (loop_byte_prefix ++ loop_byte_prefix))) 17 = 0 ∧
-    getReg (runInstrs s (block_byte_prefix_setup ++ (loop_byte_prefix ++ loop_byte_prefix))) 11
+    getReg (runInstrs s (loop_setup ++ (loop_byte_prefix ++ loop_byte_prefix))) 17 = 0 ∧
+    getReg (runInstrs s (loop_setup ++ (loop_byte_prefix ++ loop_byte_prefix))) 11
       = getReg s 11 + 2 ∧
-    getReg (runInstrs s (block_byte_prefix_setup ++ (loop_byte_prefix ++ loop_byte_prefix))) 12
+    getReg (runInstrs s (loop_setup ++ (loop_byte_prefix ++ loop_byte_prefix))) 12
       = getReg s 12 - 2 ∧
-    getReg (runInstrs s (block_byte_prefix_setup ++ (loop_byte_prefix ++ loop_byte_prefix))) 13
+    getReg (runInstrs s (loop_setup ++ (loop_byte_prefix ++ loop_byte_prefix))) 13
       = getReg s 10 + 2 ∧
-    getReg (runInstrs s (block_byte_prefix_setup ++ (loop_byte_prefix ++ loop_byte_prefix))) 14
+    getReg (runInstrs s (loop_setup ++ (loop_byte_prefix ++ loop_byte_prefix))) 14
       = getReg s 11 + 2 ∧
-    getReg (runInstrs s (block_byte_prefix_setup ++ (loop_byte_prefix ++ loop_byte_prefix))) 16
+    getReg (runInstrs s (loop_setup ++ (loop_byte_prefix ++ loop_byte_prefix))) 16
       = getReg s 10 + 2 ∧
     (∀ r : Fin 32, r.val ≠ 11 → r.val ≠ 12 → r.val ≠ 13 → r.val ≠ 14 →
                    r.val ≠ 15 → r.val ≠ 16 → r.val ≠ 17 →
-      (runInstrs s (block_byte_prefix_setup ++ (loop_byte_prefix ++ loop_byte_prefix))).regs[r.val]
+      (runInstrs s (loop_setup ++ (loop_byte_prefix ++ loop_byte_prefix))).regs[r.val]
         = s.regs[r.val]) ∧
     (∀ i : UInt32, i < 2 →
-      (runInstrs s (block_byte_prefix_setup ++ (loop_byte_prefix ++ loop_byte_prefix))).mem
+      (runInstrs s (loop_setup ++ (loop_byte_prefix ++ loop_byte_prefix))).mem
         (getReg s 10 + i) = s.mem (getReg s 11 + i)) ∧
     (∀ a : UInt32, (∀ i : UInt32, i < 2 → a ≠ getReg s 10 + i) →
-      (runInstrs s (block_byte_prefix_setup ++ (loop_byte_prefix ++ loop_byte_prefix))).mem a
+      (runInstrs s (loop_setup ++ (loop_byte_prefix ++ loop_byte_prefix))).mem a
         = s.mem a) := by
   sorry
 
@@ -397,37 +397,37 @@ theorem loop_K2_correct (s : State) (h_pre : Pre_loop_byte_prefix s)
 theorem loop_K3_correct (s : State) (h_pre : Pre_loop_byte_prefix s)
     (h_K3 : loop_byte_prefix_count s = 3) :
     (runInstrs s
-      (block_byte_prefix_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))).pc
+      (loop_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))).pc
       = s.pc + 60 ∧
     getReg (runInstrs s
-      (block_byte_prefix_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))) 17 = 0 ∧
+      (loop_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))) 17 = 0 ∧
     getReg (runInstrs s
-      (block_byte_prefix_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))) 11
+      (loop_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))) 11
       = getReg s 11 + 3 ∧
     getReg (runInstrs s
-      (block_byte_prefix_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))) 12
+      (loop_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))) 12
       = getReg s 12 - 3 ∧
     getReg (runInstrs s
-      (block_byte_prefix_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))) 13
+      (loop_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))) 13
       = getReg s 10 + 3 ∧
     getReg (runInstrs s
-      (block_byte_prefix_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))) 14
+      (loop_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))) 14
       = getReg s 11 + 3 ∧
     getReg (runInstrs s
-      (block_byte_prefix_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))) 16
+      (loop_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))) 16
       = getReg s 10 + 3 ∧
     (∀ r : Fin 32, r.val ≠ 11 → r.val ≠ 12 → r.val ≠ 13 → r.val ≠ 14 →
                    r.val ≠ 15 → r.val ≠ 16 → r.val ≠ 17 →
       (runInstrs s
-        (block_byte_prefix_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))).regs[r.val]
+        (loop_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))).regs[r.val]
         = s.regs[r.val]) ∧
     (∀ i : UInt32, i < 3 →
       (runInstrs s
-        (block_byte_prefix_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))).mem
+        (loop_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))).mem
         (getReg s 10 + i) = s.mem (getReg s 11 + i)) ∧
     (∀ a : UInt32, (∀ i : UInt32, i < 3 → a ≠ getReg s 10 + i) →
       (runInstrs s
-        (block_byte_prefix_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))).mem a
+        (loop_setup ++ ((loop_byte_prefix ++ loop_byte_prefix) ++ loop_byte_prefix))).mem a
         = s.mem a) := by
   sorry
 
@@ -440,7 +440,7 @@ theorem loop_byte_prefix_full_correct (s : State) :
   rcases K_cases s h_pre with h_K1 | h_K2 | h_K3
   · -- K = 1
     have h_eq : loop_byte_prefix_full_run (loop_byte_prefix_count s).toNat
-              = block_byte_prefix_setup ++ loop_byte_prefix := by
+              = loop_setup ++ loop_byte_prefix := by
       rw [h_K1]; rfl
     rw [h_eq, h_K1]
     exact loop_K1_correct s h_pre h_K1

@@ -39,9 +39,9 @@ structure State where
   if r = 0 then s
   else { s with regs := s.regs.set r.val v r.isLt }
 
-@[inline] def loadByte (s : State) (addr : UInt32) : UInt8 := s.mem addr
+@[inline, grind =] def loadByte (s : State) (addr : UInt32) : UInt8 := s.mem addr
 
-@[inline] def storeByte (s : State) (addr : UInt32) (b : UInt8) : State :=
+@[inline, grind =] def storeByte (s : State) (addr : UInt32) (b : UInt8) : State :=
   { s with mem := fun a => if a == addr then b else s.mem a }
 
 def loadHalf (s : State) (addr : UInt32) : UInt32 :=
