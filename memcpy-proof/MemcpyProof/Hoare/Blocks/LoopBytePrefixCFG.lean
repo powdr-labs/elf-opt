@@ -1,12 +1,10 @@
 /-
 CFG-level semantics of the byte-prefix loop (B2).
 
-This file *states* the theorems we'd want for the full byte-prefix loop
-over the actual memcpy `code` map (i.e., dynamically following PCs,
-honoring the back-edge of the bne).  All proofs are `sorry`'d; the
-purpose is to see whether the current `CFG`/`Triple`/`CodeMatchesBlock`
-machinery is expressive enough to state the loop semantics cleanly, or
-whether we need more (e.g., a `CFG.loop` combinator).
+Full CFG-level correctness of the byte-prefix loop, dynamically
+following PCs and honoring the back-edge of the bne.  Composed via
+`CFG.do_while` from four obligations: `loop_inv_init`, `loop_inv_step`,
+`loop_inv_exit`, and `K_pos_of_pre`.
 
 Address summary (from the disassembly):
   0x20090c  loop_setup           (2 instrs)
