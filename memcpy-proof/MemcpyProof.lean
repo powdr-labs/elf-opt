@@ -26,3 +26,4 @@ import MemcpyProof.Hoare.Blocks.BytePrefix
 import MemcpyProof.Hoare.Blocks.Tail8Unaligned
 import MemcpyProof.Hoare.Blocks.Tail16Unaligned
 import MemcpyProof.Hoare.Blocks.LoopBytePrefixCFG
+import MemcpyProof.Hoare.Blocks.B1B2B3Chain

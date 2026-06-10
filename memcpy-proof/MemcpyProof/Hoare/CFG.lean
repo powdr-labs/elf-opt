@@ -91,6 +91,23 @@ theorem CFG.trans {code : UInt32 → UInt32} {P Q : State → Prop}
   refine ⟨n1 + n2, stepN code n1 s, hR1, ?_⟩
   rw [stepN_add]; exact hR2
 
+/-- Strengthen the precondition: `P' → P` lets us downgrade
+    `CFG code P R` to `CFG code P' R`. -/
+theorem CFG.strengthen {code : UInt32 → UInt32} {P P' : State → Prop}
+    {R : State → State → Prop}
+    (h_pre : ∀ s, P' s → P s) (h : CFG code P R) :
+    CFG code P' R := fun s hP' => h s (h_pre s hP')
+
+/-- Weaken the post-relation: `R → R'` lets us upgrade
+    `CFG code P R` to `CFG code P R'`. -/
+theorem CFG.weaken {code : UInt32 → UInt32} {P : State → Prop}
+    {R R' : State → State → Prop}
+    (h : CFG code P R) (h_post : ∀ s s', R s s' → R' s s') :
+    CFG code P R' := by
+  intro s hP
+  obtain ⟨n, hR⟩ := h s hP
+  exact ⟨n, h_post s _ hR⟩
+
 /-! ## Bridge from `Triple` to `CFG`.
 
 `Triple block R` says `R s (runInstrs s block)` — but `runInstrs` is a
