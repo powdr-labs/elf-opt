@@ -34,24 +34,24 @@ ensures this).  Under that precondition the loop runs
 `K = min(4 - (a1 & 3), a2)` iterations, with `K ∈ {1, 2, 3}`. -/
 
 /-- Preconditions for the byte-prefix loop:
-    reachability (`src` misaligned ∧ `n ≠ 0`), non-aliasing of the
+    reachability (`src` misaligned ∧ `len ≠ 0`), non-aliasing of the
     src/dst windows, and no 32-bit pointer wraparound. -/
 def Pre_loop_byte_prefix (s : State) : Prop :=
-  let a0 := getReg s 10
-  let a1 := getReg s 11
-  let a2 := getReg s 12
-  (a1 &&& 3) ≠ 0 ∧
-  a2 ≠ 0 ∧
-  (∀ i j : UInt32, i < a2 → j < a2 → a0 + i ≠ a1 + j) ∧
-  a0.toNat + a2.toNat ≤ 2 ^ 32 ∧
-  a1.toNat + a2.toNat ≤ 2 ^ 32
+  let dst := getReg s 10
+  let src := getReg s 11
+  let len := getReg s 12
+  (src &&& 3) ≠ 0 ∧
+  len ≠ 0 ∧
+  (∀ i j : UInt32, i < len → j < len → dst + i ≠ src + j) ∧
+  dst.toNat + len.toNat ≤ 2 ^ 32 ∧
+  src.toNat + len.toNat ≤ 2 ^ 32
 
 /-- `K(s)` — the loop's iteration count, derived from `s` alone. -/
 def loop_byte_prefix_count (s : State) : UInt32 :=
-  let a1 := getReg s 11
-  let a2 := getReg s 12
-  let K_align : UInt32 := 4 - (a1 &&& 3)
-  if K_align ≤ a2 then K_align else a2
+  let src := getReg s 11
+  let len := getReg s 12
+  let K_align : UInt32 := 4 - (src &&& 3)
+  if K_align ≤ len then K_align else len
 
 /-! ## 1. Per-block code-match lemmas.
 
@@ -126,19 +126,19 @@ the original entry-state preconditions. -/
 /-- Loop invariant parameterized by the original entry state `s_entry`
     and the number of completed iterations `k`. -/
 def LoopInv (s_entry : State) (k : Nat) (s : State) : Prop :=
-  let a0 := getReg s_entry 10
-  let a1 := getReg s_entry 11
-  let a2 := getReg s_entry 12
+  let dst := getReg s_entry 10
+  let src := getReg s_entry 11
+  let len := getReg s_entry 12
   let k_u : UInt32 := k.toUInt32
   s.pc = 0x200914 ∧
-  getReg s 10 = a0 ∧
-  getReg s 11 = a1 + k_u ∧
-  getReg s 12 = a2 - k_u ∧
-  getReg s 15 = a1 + k_u + 1 ∧
-  getReg s 16 = a0 + k_u ∧
+  getReg s 10 = dst ∧
+  getReg s 11 = src + k_u ∧
+  getReg s 12 = len - k_u ∧
+  getReg s 15 = src + k_u + 1 ∧
+  getReg s 16 = dst + k_u ∧
   k ≤ (loop_byte_prefix_count s_entry).toNat ∧
-  (∀ i : UInt32, i < k_u → s.mem (a0 + i) = s_entry.mem (a1 + i)) ∧
-  (∀ a : UInt32, (∀ i : UInt32, i < k_u → a ≠ a0 + i) → s.mem a = s_entry.mem a) ∧
+  (∀ i : UInt32, i < k_u → s.mem (dst + i) = s_entry.mem (src + i)) ∧
+  (∀ a : UInt32, (∀ i : UInt32, i < k_u → a ≠ dst + i) → s.mem a = s_entry.mem a) ∧
   Pre_loop_byte_prefix s_entry
 
 /-! ## 4. The three Hoare-loop-rule sub-theorems. -/
@@ -352,17 +352,17 @@ theorem loop_inv_step (s_entry : State) (k : Nat)
     copied, pointers advanced, etc. -/
 def LoopPost (s s' : State) : Prop :=
   let K := loop_byte_prefix_count s
-  let a0 := getReg s 10
-  let a1 := getReg s 11
-  let a2 := getReg s 12
+  let dst := getReg s 10
+  let src := getReg s 11
+  let len := getReg s 12
   s'.pc = 0x200948 ∧
-  getReg s' 10 = a0 ∧
-  getReg s' 11 = a1 + K ∧
-  getReg s' 12 = a2 - K ∧
-  getReg s' 16 = a0 + K ∧
+  getReg s' 10 = dst ∧
+  getReg s' 11 = src + K ∧
+  getReg s' 12 = len - K ∧
+  getReg s' 16 = dst + K ∧
   getReg s' 17 = 0 ∧
-  (∀ i : UInt32, i < K → s'.mem (a0 + i) = s.mem (a1 + i)) ∧
-  (∀ a : UInt32, (∀ i : UInt32, i < K → a ≠ a0 + i) → s'.mem a = s.mem a) ∧
+  (∀ i : UInt32, i < K → s'.mem (dst + i) = s.mem (src + i)) ∧
+  (∀ a : UInt32, (∀ i : UInt32, i < K → a ≠ dst + i) → s'.mem a = s.mem a) ∧
   ((getReg s' 11 &&& 3 = 0) ∨ (getReg s' 12 = 0))
 
 /-- **Exit**: when we've completed `K - 1` iterations, one more

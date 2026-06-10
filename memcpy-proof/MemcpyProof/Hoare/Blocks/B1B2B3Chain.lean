@@ -69,19 +69,19 @@ def Pre_b1_entry (s : State) : Prop :=
 
   After B1's fall-through, B2's `K` byte-loop iterations, and B3's
   one-instruction `andi`, we arrive at PC `0x0020094c` with `K` bytes
-  copied.  Since B1 doesn't touch a0/a1/a2 and B3 doesn't touch
-  a0/a2/mem, the relation can be stated directly in terms of the
+  copied.  Since B1 doesn't touch dst/src/len and B3 doesn't touch
+  dst/len/mem, the relation can be stated directly in terms of the
   original `s`. -/
 def R_b1_b2_b3 (s s' : State) : Prop :=
   let K := loop_byte_prefix_count s
-  let a0 := getReg s 10
-  let a1 := getReg s 11
-  let a2 := getReg s 12
+  let dst := getReg s 10
+  let src := getReg s 11
+  let len := getReg s 12
   s'.pc = 0x0020094c ∧
-  getReg s' 10 = a0 ∧
-  getReg s' 12 = a2 - K ∧
-  (∀ i : UInt32, i < K → s'.mem (a0 + i) = s.mem (a1 + i)) ∧
-  (∀ a : UInt32, (∀ i : UInt32, i < K → a ≠ a0 + i) → s'.mem a = s.mem a)
+  getReg s' 10 = dst ∧
+  getReg s' 12 = len - K ∧
+  (∀ i : UInt32, i < K → s'.mem (dst + i) = s.mem (src + i)) ∧
+  (∀ a : UInt32, (∀ i : UInt32, i < K → a ≠ dst + i) → s'.mem a = s.mem a)
 
 /-! ## 5. The chained theorem.
 

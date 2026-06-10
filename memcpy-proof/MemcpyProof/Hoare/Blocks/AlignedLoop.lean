@@ -43,14 +43,14 @@ private theorem block_F_iter_h1_triple_composed :
 
 private def R_h1 : State → State → Prop :=
   fun s s' =>
-    let a4 := getReg s 14
-    let w0 := loadWord s a4
-    let w1 := loadWord s (a4 + 4)
-    let w2 := loadWord s (a4 + 8)
-    let w3 := loadWord s (a4 + 12)
+    let src := getReg s 14
+    let w0 := loadWord s src
+    let w1 := loadWord s (src + 4)
+    let w2 := loadWord s (src + 8)
+    let w3 := loadWord s (src + 12)
     s'.pc = s.pc + 20 ∧
     getReg s' 13 = getReg s 13 ∧
-    getReg s' 14 = a4 ∧
+    getReg s' 14 = src ∧
     getReg s' 15 = w0 ∧
     getReg s' 16 = w1 ∧
     getReg s' 17 = w2 ∧
@@ -97,10 +97,10 @@ private theorem block_F_iter_h2_triple_composed :
 
 private def R_h2 : State → State → Prop :=
   fun s s' =>
-    let a3 := getReg s 13
+    let dst := getReg s 13
     s'.pc = s.pc + 24 ∧
     getReg s' 12 = getReg s 12 + 0xFFFFFFF0 ∧
-    getReg s' 13 = a3 + 16 ∧
+    getReg s' 13 = dst + 16 ∧
     getReg s' 14 = getReg s 14 + 16 ∧
     getReg s' 15 = getReg s 15 ∧
     getReg s' 16 = getReg s 16 ∧
@@ -109,9 +109,9 @@ private def R_h2 : State → State → Prop :=
     (∀ r : Fin 32, r.val ≠ 12 → r.val ≠ 13 → r.val ≠ 14 →
        s'.regs[r.val] = s.regs[r.val]) ∧
     s'.mem = (storeWord (storeWord (storeWord s
-                (a3 + 4) (getReg s 16))
-                (a3 + 8) (getReg s 17))
-                (a3 + 12) (getReg s 5)).mem
+                (dst + 4) (getReg s 16))
+                (dst + 8) (getReg s 17))
+                (dst + 12) (getReg s 5)).mem
 
 private theorem block_F_iter_h2_triple : Triple block_F_iter_h2 R_h2 := by
   refine Triple.weaken block_F_iter_h2_triple_composed ?_
@@ -130,6 +130,84 @@ def block_F_iter : List Instr := block_F_iter_h1 ++ block_F_iter_h2
 theorem block_F_iter_triple_composed :
     Triple block_F_iter (RComp R_h1 R_h2) :=
   block_F_iter_h1_triple.append block_F_iter_h2_triple
+
+/-- Public post-relation for `block_F_iter` (11-instr aligned 16-byte
+    copy body).  Pointers advanced by 16, count decremented by 16, and
+    four word-stores (`dst + 0/4/8/12`) reflect the words loaded from
+    `src + 0/4/8/12`. -/
+def R_block_F_iter : State → State → Prop :=
+  fun s s' =>
+    let dst := getReg s 13
+    let src := getReg s 14
+    let len := getReg s 12
+    s'.pc = s.pc + 44 ∧
+    getReg s' 11 = getReg s 11 ∧
+    getReg s' 12 = len + 0xFFFFFFF0 ∧
+    getReg s' 13 = dst + 16 ∧
+    getReg s' 14 = src + 16 ∧
+    (∀ r : Fin 32, r.val ≠ 5 → r.val ≠ 12 → r.val ≠ 13 → r.val ≠ 14 →
+                   r.val ≠ 15 → r.val ≠ 16 → r.val ≠ 17 →
+       s'.regs[r.val] = s.regs[r.val]) ∧
+    s'.mem = (storeWord (storeWord (storeWord (storeWord s
+                dst (loadWord s src))
+                (dst + 4) (loadWord s (src + 4)))
+                (dst + 8) (loadWord s (src + 8)))
+                (dst + 12) (loadWord s (src + 12))).mem
+
+theorem block_F_iter_triple : Triple block_F_iter R_block_F_iter := by
+  refine Triple.weaken block_F_iter_triple_composed ?_
+  rintro s s' ⟨t, h1, h2⟩
+  simp only [R_h1] at h1
+  simp only [R_h2] at h2
+  obtain ⟨h1_pc, h1_13, h1_14, h1_15, h1_16, h1_17, h1_5, h1_frame, h1_mem⟩ := h1
+  obtain ⟨h2_pc, h2_12, h2_13, h2_14, h2_15, h2_16, h2_17, h2_5, h2_frame, h2_mem⟩ := h2
+  -- Frame facts at t (R_h1 only touches regs 5,15,16,17).
+  have ht_11 : t.regs[11] = s.regs[11] :=
+    h1_frame ⟨11, by decide⟩ (by decide) (by decide) (by decide) (by decide)
+  have ht_12 : t.regs[12] = s.regs[12] :=
+    h1_frame ⟨12, by decide⟩ (by decide) (by decide) (by decide) (by decide)
+  have ht_13 : t.regs[13] = s.regs[13] :=
+    h1_frame ⟨13, by decide⟩ (by decide) (by decide) (by decide) (by decide)
+  have ht_14 : t.regs[14] = s.regs[14] :=
+    h1_frame ⟨14, by decide⟩ (by decide) (by decide) (by decide) (by decide)
+  -- Lifted to getReg (for non-zero regs).
+  have hg_t11 : getReg t 11 = getReg s 11 := by
+    unfold getReg; rw [if_neg (by decide), if_neg (by decide)]; exact ht_11
+  have hg_t12 : getReg t 12 = getReg s 12 := by
+    unfold getReg; rw [if_neg (by decide), if_neg (by decide)]; exact ht_12
+  have hg_t13 : getReg t 13 = getReg s 13 := by
+    unfold getReg; rw [if_neg (by decide), if_neg (by decide)]; exact ht_13
+  have hg_t14 : getReg t 14 = getReg s 14 := by
+    unfold getReg; rw [if_neg (by decide), if_neg (by decide)]; exact ht_14
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · -- pc
+    rw [h2_pc, h1_pc]; bv_decide
+  · -- a1 (reg 11) unchanged
+    show s'.regs[11] = s.regs[11]
+    rw [h2_frame ⟨11, by decide⟩ (by decide) (by decide) (by decide), ht_11]
+  · -- a2 (reg 12) = a2 + 0xFFFFFFF0
+    rw [h2_12, hg_t12]
+  · -- a3 (reg 13) = a3 + 16
+    rw [h2_13, hg_t13]
+  · -- a4 (reg 14) = a4 + 16
+    rw [h2_14, hg_t14]
+  · -- Frame: r ≠ 5, 12, 13, 14, 15, 16, 17
+    intro r h5 h12 h13 h14 h15 h16 h17
+    rw [h2_frame r h12 h13 h14]; exact h1_frame r h5 h15 h16 h17
+  · -- Memory: 4 storeWords with loaded values.
+    -- s'.mem = (storeWord (storeWord (storeWord t (a3+4) (getReg t 16)) (a3+8) (getReg t 17))
+    --                     (a3+12) (getReg t 5)).mem  (from h2_mem)
+    -- where a3 = getReg t 13 = getReg s 13 (since R_h1 doesn't touch 13).
+    -- t.mem = (storeWord s a3 (getReg t 15)).mem  (from h1_mem)
+    -- getReg t 15 = loadWord s (getReg s 14 + 0),  similarly 16/17/5 for offsets 4/8/12.
+    rw [h2_mem, hg_t13, h1_16, h1_17, h1_5]
+    -- Goal: (storeWord (storeWord (storeWord t ...) ...) ...).mem
+    --     = (storeWord (storeWord (storeWord (storeWord s a3 (loadWord s a4)) ...) ...) ...).mem
+    -- The .mem of any storeByte/storeWord chain depends only on the
+    -- bottom state's `.mem` field.  Reduce both sides to byte-level
+    -- and substitute t.mem via h1_mem.
+    funext addr
+    simp only [storeWord, storeByte, h1_mem]
 
 /-! ## B13 — preamble (1 instr) + B14 (11 instr). -/
 
