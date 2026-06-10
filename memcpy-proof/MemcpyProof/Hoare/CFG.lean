@@ -108,6 +108,36 @@ theorem CFG.weaken {code : UInt32 → UInt32} {P : State → Prop}
   obtain ⟨n, hR⟩ := h s hP
   exact ⟨n, h_post s _ hR⟩
 
+/-- Weaken with access to the entry precondition `P`.
+
+    Useful when the new post-relation `R'` depends on facts that follow
+    from `P s` (e.g., the entry state's pc, register values that aren't
+    in `R`'s post). -/
+theorem CFG.weaken_with_pre {code : UInt32 → UInt32} {P : State → Prop}
+    {R R' : State → State → Prop}
+    (h : CFG code P R) (h_post : ∀ s s', P s → R s s' → R' s s') :
+    CFG code P R' := by
+  intro s hP
+  obtain ⟨n, hR⟩ := h s hP
+  exact ⟨n, h_post s _ hP hR⟩
+
+/-- Sequential composition where the mid-function can use the entry
+    precondition `P`.
+
+    This is the workhorse for chaining CFG fragments when the dispatch
+    at the join (e.g., a `bne`'s taken/not-taken branch) is determined
+    by `P` rather than by `R₁`'s post alone. -/
+theorem CFG.trans_with_pre {code : UInt32 → UInt32} {P Q : State → Prop}
+    {R₁ R₂ : State → State → Prop}
+    (h₁ : CFG code P R₁) (h_mid : ∀ s s', P s → R₁ s s' → Q s')
+    (h₂ : CFG code Q R₂) :
+    CFG code P (RComp R₁ R₂) := by
+  intro s hP
+  obtain ⟨n1, hR1⟩ := h₁ s hP
+  obtain ⟨n2, hR2⟩ := h₂ (stepN code n1 s) (h_mid s _ hP hR1)
+  refine ⟨n1 + n2, stepN code n1 s, hR1, ?_⟩
+  rw [stepN_add]; exact hR2
+
 /-! ## Bridge from `Triple` to `CFG`.
 
 `Triple block R` says `R s (runInstrs s block)` — but `runInstrs` is a
@@ -143,6 +173,29 @@ theorem CodeMatchesBlock_append (code : UInt32 → UInt32) (s : State) (b1 b2 : 
     refine ⟨h1.1, ih (exec s i) h1.2 ?_⟩
     show CodeMatchesBlock code (runInstrs (exec s i) is) b2
     exact h2
+
+/-- Tactic for discharging `CodeMatchesBlock <code> s <block>` goals when
+    `<block>` is a concrete list of instructions, the entry pc is known
+    (via a hypothesis `s.pc = <literal>` already in context), and all
+    but the last instruction is non-branching (so each `(exec _ _).pc`
+    reduces to `_ + 4` via `@[simp]` lemmas).
+
+    Usage: `mc_matches` (the pc hypothesis is picked up by `simp_all`).
+
+    Recursively splits each `And` of `CodeMatchesBlock`, dispatching
+    every `decode (code <expr>) = <instr>` conjunct via `simp_all; rfl`.
+    `simp_all` uses every hypothesis (including the pc equation), which
+    substitutes `s.pc` and reduces the exec-chain pc to a literal. -/
+syntax "mc_matches" : tactic
+
+macro_rules
+  | `(tactic| mc_matches) =>
+    `(tactic|
+      first
+      | exact True.intro
+      | (refine ⟨?_, ?_⟩
+         · (simp_all; first | rfl | (simp_all; rfl))
+         · mc_matches))
 
 /-- Stepping `block.length` times under `code` is exactly running the
     list via `runInstrs`, provided `code` matches the block as we go. -/

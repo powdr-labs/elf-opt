@@ -61,51 +61,16 @@ PC decodes to exactly the block's instruction list (via
 using the per-PC `code_at_*` equations in `Extract.lean`. -/
 
 theorem mc_matches_loop_setup (s : State) (h : s.pc = 0x20090c) :
-    CodeMatchesBlock mc s loop_setup := by
-  refine ⟨?_, ?_, trivial⟩
-  · show decode (mc s.pc) = Instr.addi 15 11 1
-    rw [h]; rfl
-  · show decode (mc (exec s (Instr.addi 15 11 1)).pc) = Instr.addi 16 10 0
-    rw [show (exec s (Instr.addi 15 11 1)).pc = 0x200910 from by simp [h]]
-    rfl
+    CodeMatchesBlock mc s loop_setup := by mc_matches
 
 theorem mc_matches_loop_copy_byte (s : State) (h : s.pc = 0x200914) :
-    CodeMatchesBlock mc s loop_copy_byte := by
-  refine ⟨?_, ?_, ?_, ?_, trivial⟩
-  · show decode (mc s.pc) = Instr.lb 17 11 0
-    rw [h]; rfl
-  · rw [show (exec s (Instr.lb 17 11 0)).pc = 0x200918 from by simp [h]]
-    rfl
-  · rw [show (exec (exec s _) (Instr.addi 14 11 1)).pc = 0x20091c from by simp [h]]
-    rfl
-  · rw [show (exec (exec (exec s _) _) (Instr.addi 13 16 1)).pc = 0x200920 from by simp [h]]
-    rfl
+    CodeMatchesBlock mc s loop_copy_byte := by mc_matches
 
 theorem mc_matches_loop_predicate (s : State) (h : s.pc = 0x200924) :
-    CodeMatchesBlock mc s loop_predicate := by
-  refine ⟨?_, ?_, ?_, ?_, ?_, trivial⟩
-  · show decode (mc s.pc) = Instr.addi 12 12 0xFFFFFFFF
-    rw [h]; rfl
-  · rw [show (exec s (Instr.addi 12 12 0xFFFFFFFF)).pc = 0x200928 from by simp [h]]
-    rfl
-  · rw [show (exec (exec s _) (Instr.andi 11 15 3)).pc = 0x20092c from by simp [h]]
-    rfl
-  · rw [show (exec (exec (exec s _) _) (Instr.sltu 11 0 11)).pc = 0x200930 from by simp [h]]
-    rfl
-  · rw [show (exec (exec (exec (exec s _) _) _) (Instr.sltu 16 0 12)).pc = 0x200934
-          from by simp [h]]
-    rfl
+    CodeMatchesBlock mc s loop_predicate := by mc_matches
 
 theorem mc_matches_loop_branch (s : State) (h : s.pc = 0x200938) :
-    CodeMatchesBlock mc s loop_branch := by
-  refine ⟨?_, ?_, ?_, ?_, trivial⟩
-  · simp [h]; rfl
-  · rw [show (exec s (Instr.addi 15 15 1)).pc = 0x20093c from by simp [h]]
-    rfl
-  · rw [show (exec (exec s _) (Instr.addi 11 14 0)).pc = 0x200940 from by simp [h]]
-    rfl
-  · rw [show (exec (exec (exec s _) _) (Instr.addi 16 13 0)).pc = 0x200944 from by simp [h]]
-    rfl
+    CodeMatchesBlock mc s loop_branch := by mc_matches
 
 /-- Post-pc of `loop_copy_byte`: starting at `0x200914`, the four
     non-branching instructions advance pc by 16 to `0x200924`. -/

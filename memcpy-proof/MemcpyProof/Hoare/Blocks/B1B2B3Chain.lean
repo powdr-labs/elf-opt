@@ -30,23 +30,10 @@ open MemcpyProof.RV32I
 /-! ## 1. `CodeMatchesBlock` lemmas for B1 and B3. -/
 
 theorem mc_matches_block_align_check (s : State) (h : s.pc = 0x002008f8) :
-    CodeMatchesBlock mc s block_align_check := by
-  refine ⟨?_, ?_, ?_, ?_, ?_, trivial⟩
-  · show decode (mc s.pc) = Instr.andi 13 11 3
-    rw [h]; rfl
-  · rw [show (exec s (Instr.andi 13 11 3)).pc = 0x002008fc from by simp [h]]; rfl
-  · rw [show (exec (exec s _) (Instr.sltiu 13 13 1)).pc = 0x00200900 from by simp [h]]; rfl
-  · rw [show (exec (exec (exec s _) _) (Instr.sltiu 14 12 1)).pc = 0x00200904 from by simp [h]]
-    rfl
-  · rw [show (exec (exec (exec (exec s _) _) _) (Instr.or_ 13 13 14)).pc = 0x00200908
-          from by simp [h]]
-    rfl
+    CodeMatchesBlock mc s block_align_check := by mc_matches
 
 theorem mc_matches_block_B3 (s : State) (h : s.pc = 0x00200948) :
-    CodeMatchesBlock mc s block_B3 := by
-  refine ⟨?_, trivial⟩
-  show decode (mc s.pc) = Instr.andi 11 13 3
-  rw [h]; rfl
+    CodeMatchesBlock mc s block_B3 := by mc_matches
 
 /-! ## 2. Per-block CFG fragments via `CFG_of_Triple_at`. -/
 
@@ -98,79 +85,71 @@ def R_b1_b2_b3 (s s' : State) : Prop :=
 
 /-! ## 5. The chained theorem.
 
-Manual stepN chaining (rather than `CFG.trans`) because B1's post
-doesn't carry the entry-precondition info, so the "mid" function would
-need access to `Pre_b1_entry`'s premises (which `CFG.trans`'s signature
-doesn't expose).  We just unfold and chain `cfg_block_align_check`,
-`byte_prefix_loop_correct`, and `cfg_block_B3`. -/
+Composed via the new `CFG.trans_with_pre` + `CFG.weaken_with_pre`
+combinators.  The mid-functions can use the entry precondition, which
+is what makes B1's fall-through case provable (it depends on
+`Pre_b1_entry`'s `(a1 & 3) ≠ 0 ∧ a2 ≠ 0`). -/
+
+/-- Frame-on-non-modified-regs helper for B1: a0/a1/a2 are preserved. -/
+private theorem b1_frame_a012 (s s' : State) (hR : R_block_align_check s s') :
+    getReg s' 10 = getReg s 10 ∧
+    getReg s' 11 = getReg s 11 ∧
+    getReg s' 12 = getReg s 12 := by
+  obtain ⟨_, _, _, h1_frame, _⟩ := hR
+  refine ⟨?_, ?_, ?_⟩ <;>
+    (show s'.regs[_] = s.regs[_]; exact h1_frame ⟨_, by decide⟩ (by decide) (by decide))
 
 theorem cfg_b1_b2_b3 :
     CFG mc Pre_b1_entry R_b1_b2_b3 := by
-  intro s hP
-  obtain ⟨h_pc, h_align, h_a2_ne, h_no_alias, h_no_wrap_a0, h_no_wrap_a1⟩ := hP
-  -- B1.
-  obtain ⟨n1, hR1⟩ := cfg_block_align_check s h_pc
-  simp only [R_block_align_check] at hR1
-  obtain ⟨h1_pc, h1_13, h1_14, h1_frame, h1_mem⟩ := hR1
-  have h_v13_false : ((getReg s 11 &&& 3) == 0) = false := by simp; exact h_align
-  have h_v14_false : (getReg s 12 == 0) = false := by simp; exact h_a2_ne
-  have h_s1_pc : (stepN mc n1 s).pc = 0x0020090c := by
-    rw [h1_pc, h_v13_false, h_v14_false]; simp; rw [h_pc]; decide
-  have h_s1_10 : getReg (stepN mc n1 s) 10 = getReg s 10 := by
-    show (stepN mc n1 s).regs[10] = s.regs[10]
-    exact h1_frame ⟨10, by decide⟩ (by decide) (by decide)
-  have h_s1_11 : getReg (stepN mc n1 s) 11 = getReg s 11 := by
-    show (stepN mc n1 s).regs[11] = s.regs[11]
-    exact h1_frame ⟨11, by decide⟩ (by decide) (by decide)
-  have h_s1_12 : getReg (stepN mc n1 s) 12 = getReg s 12 := by
-    show (stepN mc n1 s).regs[12] = s.regs[12]
-    exact h1_frame ⟨12, by decide⟩ (by decide) (by decide)
-  have h_pre_loop : Pre_loop_byte_prefix (stepN mc n1 s) := by
-    refine ⟨?_, ?_, ?_, ?_, ?_⟩
-    · rw [h_s1_11]; exact h_align
-    · rw [h_s1_12]; exact h_a2_ne
-    · rw [h_s1_10, h_s1_11, h_s1_12]; exact h_no_alias
-    · rw [h_s1_10, h_s1_12]; exact h_no_wrap_a0
-    · rw [h_s1_11, h_s1_12]; exact h_no_wrap_a1
-  -- B2.
-  obtain ⟨n2, hR2⟩ := byte_prefix_loop_correct (stepN mc n1 s) ⟨h_s1_pc, h_pre_loop⟩
-  simp only [LoopPost] at hR2
-  obtain ⟨h2_pc, h2_10, _, h2_12, _, _, h2_mem_copied, h2_mem_frame, _⟩ := hR2
-  -- B3.
-  obtain ⟨n3, hR3⟩ := cfg_block_B3 (stepN mc n2 (stepN mc n1 s)) h2_pc
-  refine ⟨n1 + n2 + n3, ?_⟩
-  -- Combine via stepN_add.
-  rw [stepN_add, stepN_add]
-  -- s3 := stepN mc n3 (stepN mc n2 (stepN mc n1 s)) = advance (setReg ... 11 ...)
-  have h_K_eq : loop_byte_prefix_count (stepN mc n1 s) = loop_byte_prefix_count s := by
-    unfold loop_byte_prefix_count; rw [h_s1_11, h_s1_12]
+  -- B1 lifted to start from `Pre_b1_entry`.
+  have h_b1 : CFG mc Pre_b1_entry R_block_align_check :=
+    CFG.strengthen (fun _ hP => hP.1) cfg_block_align_check
+  -- B1 → B2: under entry's premises, B1's post lands us at B2's pre.
+  have h_mid_12 : ∀ s s', Pre_b1_entry s → R_block_align_check s s' →
+      (s'.pc = 0x0020090c ∧ Pre_loop_byte_prefix s') := by
+    rintro s s' ⟨h_pc, h_align, h_a2_ne, h_no_alias, h_no_wrap_a0, h_no_wrap_a1⟩ hR
+    obtain ⟨h_10, h_11, h_12⟩ := b1_frame_a012 s s' hR
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+    · obtain ⟨h1_pc, _⟩ := hR
+      have h_v13_false : ((getReg s 11 &&& 3) == 0) = false := by simp; exact h_align
+      have h_v14_false : (getReg s 12 == 0) = false := by simp; exact h_a2_ne
+      rw [h1_pc, h_v13_false, h_v14_false]; simp; rw [h_pc]; decide
+    · rw [h_11]; exact h_align
+    · rw [h_12]; exact h_a2_ne
+    · rw [h_10, h_11, h_12]; exact h_no_alias
+    · rw [h_10, h_12]; exact h_no_wrap_a0
+    · rw [h_11, h_12]; exact h_no_wrap_a1
+  have h_b1_b2 := CFG.trans_with_pre h_b1 h_mid_12 byte_prefix_loop_correct
+  -- B1+B2 → B3: B2's LoopPost gives pc = 0x00200948.
+  have h_mid_23 : ∀ s s', RComp R_block_align_check LoopPost s s' →
+      s'.pc = 0x00200948 := by
+    rintro s s' ⟨_, _, hLoop⟩; exact hLoop.1
+  have h_b1_b2_b3 := CFG.trans h_b1_b2 h_mid_23 cfg_block_B3
+  -- Weaken the composed RComp into the cleaner `R_b1_b2_b3`.
+  apply CFG.weaken_with_pre h_b1_b2_b3
+  intro s s_final hP hChain
+  -- RComp (RComp R_b1 LoopPost) R_B3 = ∃ s2, (∃ s1, R_b1 s s1 ∧ LoopPost s1 s2) ∧ R_B3 s2 s_final
+  obtain ⟨s2, ⟨s1, hR1, hLoop⟩, hB3⟩ := hChain
+  obtain ⟨_, h_align, h_a2_ne, _⟩ := hP
+  simp only [LoopPost] at hLoop
+  obtain ⟨h2_pc, h2_10, _, h2_12, _, _, h2_mem_copied, h2_mem_frame, _⟩ := hLoop
+  obtain ⟨h_10, h_11, h_12⟩ := b1_frame_a012 s s1 hR1
+  have h1_mem : s1.mem = s.mem := hR1.2.2.2.2
+  have h_K_eq : loop_byte_prefix_count s1 = loop_byte_prefix_count s := by
+    unfold loop_byte_prefix_count; rw [h_11, h_12]
   refine ⟨?_, ?_, ?_, ?_, ?_⟩
-  · -- pc = 0x0020094c
-    rw [hR3]; simp [h2_pc]
-  · -- getReg s3 10 = getReg s 10
-    rw [hR3]; simp; rw [h2_10, h_s1_10]
-  · -- getReg s3 12 = getReg s 12 - K
-    rw [hR3]; simp; rw [h2_12, h_s1_12, h_K_eq]
-  · -- ∀ i < K, mem(a0 + i) = src.mem(a1 + i)
-    intro i hi
-    rw [hR3]
-    show (advance _).mem (getReg s 10 + i) = s.mem (getReg s 11 + i)
-    rw [advance_mem, setReg_mem]
-    have hi' : i < loop_byte_prefix_count (stepN mc n1 s) := by rw [h_K_eq]; exact hi
-    have := h2_mem_copied i hi'
-    rw [h_s1_10, h_s1_11] at this
+  · rw [hB3]; simp [h2_pc]
+  · rw [hB3]; simp; rw [h2_10, h_10]
+  · rw [hB3]; simp; rw [h2_12, h_12, h_K_eq]
+  · intro i hi
+    rw [hB3]; show (advance _).mem _ = _; rw [advance_mem, setReg_mem]
+    have := h2_mem_copied i (h_K_eq ▸ hi)
+    rw [h_10, h_11] at this
     rw [this, h1_mem]
-  · -- ∀ a, (∀ i < K, a ≠ a0 + i) → s3.mem a = s.mem a
-    intro a h_ne
-    rw [hR3]
-    show (advance _).mem a = s.mem a
-    rw [advance_mem, setReg_mem]
-    have h_ne' : ∀ i : UInt32, i < loop_byte_prefix_count (stepN mc n1 s) →
-                  a ≠ getReg (stepN mc n1 s) 10 + i := by
-      intro i hi
-      rw [h_s1_10]
-      exact h_ne i (h_K_eq ▸ hi)
-    have := h2_mem_frame a h_ne'
-    rw [this, h1_mem]
+  · intro a h_ne
+    rw [hB3]; show (advance _).mem _ = _; rw [advance_mem, setReg_mem]
+    have h_ne' : ∀ i, i < loop_byte_prefix_count s1 → a ≠ getReg s1 10 + i := by
+      intro i hi; rw [h_10]; exact h_ne i (h_K_eq ▸ hi)
+    rw [h2_mem_frame a h_ne', h1_mem]
 
 end MemcpyProof.Hoare
