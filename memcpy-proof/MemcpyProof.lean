@@ -10,6 +10,7 @@ import MemcpyProof.Hoare.Block
 import MemcpyProof.Hoare.InstrEqns
 import MemcpyProof.Hoare.StateLemmas
 import MemcpyProof.Hoare.Triple
+import MemcpyProof.Hoare.CFG
 import MemcpyProof.Hoare.InstrTriples
 import MemcpyProof.Hoare.BlockF
 import MemcpyProof.Hoare.Block8
